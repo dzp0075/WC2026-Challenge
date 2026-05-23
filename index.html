@@ -297,10 +297,11 @@ const FLAGS={
   'England':null,'Croatia':'HR','Ghana':'GH','Panama':'PA'
 };
 function flag(name){
-  if(name==='Scotland') return '\uD83C\uDFF4\uDB40\uDC67\uDB40\uDC62\uDB40\uDC73\uDB40\uDC63\uDB40\uDC74\uDB40\uDC7F';
-  if(name==='England')  return '\uD83C\uDFF4\uDB40\uDC67\uDB40\uDC62\uDB40\uDC65\uDB40\uDC6E\uDB40\uDC67\uDB40\uDC7F';
+  const img=(code,alt)=>`<img src="https://flagcdn.com/20x15/${code}.png" alt="${alt}" style="vertical-align:middle;border-radius:1px">`;
+  if(name==='Scotland') return img('gb-sct','Scotland');
+  if(name==='England')  return img('gb-eng','England');
   const c=FLAGS[name]; if(!c) return '';
-  return c.split('').map(ch=>String.fromCodePoint(0x1F1E6+ch.charCodeAt(0)-65)).join('');
+  return img(c.toLowerCase(),name);
 }
 function dn(name){return name==='TBD'?'TBD':flag(name)+' '+name;}
 
