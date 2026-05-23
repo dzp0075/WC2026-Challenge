@@ -10,6 +10,7 @@
   --pitch:#07180a; --mid:#0c2210; --card:#0f2914; --border:#1d4125;
   --accent:#f5c518; --acc2:#ffd84d; --text:#e6f0e7; --muted:#6b9e73;
   --r:6px;
+  --win-border:#3d9e52;
   /* score colours matching the spreadsheet */
   --c-15: #1a6b2a;   /* 15pts - correct position + advance */
   --c-10: #2d5c1a;   /* 10pts - correct team advance */
@@ -108,13 +109,6 @@ table.ss tr:hover td{background:rgba(255,255,255,0.02)}
 .lb-breakdown{font-size:10px;color:var(--muted);line-height:1.5}
 
 /* INPUT STYLES */
-input[type=number]{
-  width:34px;height:26px;text-align:center;background:var(--mid);
-  border:1px solid var(--border);border-radius:3px;color:var(--text);
-  font-size:12px;font-weight:600;font-family:'DM Sans';
-}
-input[type=number]:focus{outline:none;border-color:var(--accent)}
-input[type=number][readonly]{opacity:.5;cursor:not-allowed}
 select{
   background:var(--mid);border:1px solid var(--border);border-radius:3px;
   color:var(--text);font-size:11px;padding:3px 5px;cursor:pointer;
@@ -134,13 +128,6 @@ table.ss td.result{font-weight:700;color:var(--acc2)}
 .rule-card .stage{font-family:'Bebas Neue';font-size:13px;color:var(--muted);letter-spacing:.08em}
 .rule-card .desc{font-size:12px;margin:.25rem 0}
 .rule-card .pts{font-family:'Bebas Neue';font-size:26px;color:var(--accent)}
-
-.btn{background:var(--accent);color:#07180a;border:none;padding:7px 14px;
-  border-radius:var(--r);font-family:'Bebas Neue';font-size:14px;letter-spacing:.05em;
-  cursor:pointer;transition:opacity .2s}
-.btn:hover{opacity:.85}
-.btn-sm{padding:5px 10px;font-size:12px}
-.btn-ghost{background:var(--mid);color:var(--text);border:1px solid var(--border)}
 
 .toolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:.75rem}
 
@@ -196,7 +183,7 @@ table.ss td.result{font-weight:700;color:var(--acc2)}
 <!-- ══ KNOCKOUT ══ -->
 <div id="knockout" class="page">
   <h2 class="page-title">Knockout Stage Predictions</h2>
-  <p class="page-sub">R16: 20pts &middot; QF: 30pts &middot; SF: 40pts &middot; Final: 50pts per correct pick</p>
+  <p class="page-sub">R32: 20pts &middot; R16: 30pts &middot; QF: 30pts &middot; SF: 40pts &middot; Final: 50pts per correct pick</p>
   <div id="koContent"></div>
 </div>
 
@@ -298,6 +285,7 @@ function dn(name){return name==='TBD'?'TBD':flag(name)+' '+name;}
 // ── ACTUAL RESULTS (populated by openfootball fetch) ──
 // actualGroups[g] = sorted array of team names (1st..4th) once group complete
 const actualGroups = {}; // g -> [t1,t2,t3,t4]
+const thirdPlaceAdvancers = new Set(); // top-8 3rd-place teams that advance to R32
 // actualKO[round][idx] = winning team name
 const actualKO = { r32:{}, r16:{}, qf:{}, sf:{}, final:null };
 
@@ -346,7 +334,7 @@ function calcGroupPoints(player, g){
     const actPos = actual.indexOf(team);
     if(actPos === -1) return;
     const predAdvances = predPos < 2;
-    const actAdvances  = actPos  < 2;
+    const actAdvances  = actPos < 2 || (actPos === 2 && thirdPlaceAdvancers.has(team));
     const posCorrect   = predPos === actPos;
     if(posCorrect && actAdvances) pts += 15;
     else if(posCorrect)           pts += 5;
@@ -382,6 +370,27 @@ function koPts(player,round){
   const n=koMatches[round].length;
   for(let i=0;i<n;i++) pts+=calcKOPoints(player,round,i);
   return pts;
+}
+
+// ══════════════════════════════════════════════════════
+//  PERSISTENCE
+// ══════════════════════════════════════════════════════
+function savePredictions(){
+  try{
+    localStorage.setItem('wc2026_preds',JSON.stringify(predictions));
+    localStorage.setItem('wc2026_kopreds',JSON.stringify(koPredictions));
+  }catch(e){}
+}
+function loadPredictions(){
+  try{
+    const p=JSON.parse(localStorage.getItem('wc2026_preds'));
+    const k=JSON.parse(localStorage.getItem('wc2026_kopreds'));
+    if(p) PLAYERS.forEach(pl=>{
+      if(!p[pl]) return;
+      GK.forEach(g=>{ if(p[pl][g]&&p[pl][g].length===4) predictions[pl][g]=p[pl][g]; });
+    });
+    if(k) PLAYERS.forEach(pl=>{ if(k[pl]) Object.assign(koPredictions[pl],k[pl]); });
+  }catch(e){}
 }
 
 // ══════════════════════════════════════════════════════
@@ -465,6 +474,23 @@ async function fetchResults(){
       if(played===6) actualGroups[g]=sorted.map(t=>t.name);
     });
 
+    // rank 3rd-place teams — top 8 of 12 advance to R32
+    thirdPlaceAdvancers.clear();
+    const thirds=GK.filter(g=>actualGroups[g]).map(g=>{
+      const name=actualGroups[g][2];
+      const ti=GROUPS[g].teams.indexOf(name);
+      let pts=0,gd=0,gf=0;
+      groupScores[g].forEach(m=>{
+        const h=parseInt(m.sh),a=parseInt(m.sa);
+        if(isNaN(h)||isNaN(a)) return;
+        if(m.h===ti){gf+=h;gd+=h-a;pts+=h>a?3:h===a?1:0;}
+        if(m.a===ti){gf+=a;gd+=a-h;pts+=a>h?3:a===h?1:0;}
+      });
+      return{name,pts,gd,gf};
+    });
+    thirds.sort((a,b)=>b.pts-a.pts||b.gd-a.gd||b.gf-a.gf)
+      .slice(0,8).forEach(t=>thirdPlaceAdvancers.add(t.name));
+
     // also update R32 bracket from group qualifiers
     updateKOBracket();
     renderAll();
@@ -509,6 +535,7 @@ function renderLeaderboard(){
       <div class="lb-breakdown">
         Group: ${groupPts(p)} &bull;
         R32: ${koPts(p,'r32')} &bull;
+        R16: ${koPts(p,'r16')} &bull;
         QF: ${koPts(p,'qf')} &bull;
         SF: ${koPts(p,'sf')} &bull;
         Final: ${koPts(p,'final')}
@@ -518,11 +545,12 @@ function renderLeaderboard(){
 
   // summary table
   const tbl=document.getElementById('lbTable');
-  const hRow='<tr><th class="left">Player</th><th>Group Stage</th><th>R32</th><th>QF</th><th>SF</th><th>Final</th><th>TOTAL</th><th>Rank</th></tr>';
+  const hRow='<tr><th class="left">Player</th><th>Group Stage</th><th>R32</th><th>R16</th><th>QF</th><th>SF</th><th>Final</th><th>TOTAL</th><th>Rank</th></tr>';
   const rows=ranked.map((p,i)=>`<tr>
     <td class="left" style="font-weight:600">${p}</td>
     <td>${groupPts(p)}</td>
     <td>${koPts(p,'r32')}</td>
+    <td>${koPts(p,'r16')}</td>
     <td>${koPts(p,'qf')}</td>
     <td>${koPts(p,'sf')}</td>
     <td>${koPts(p,'final')}</td>
@@ -644,6 +672,7 @@ function setPrediction(player, g, newPosStr, teamName){
   const displaced=pred[newPos];
   pred[newPos]=teamName;
   pred[oldPos]=displaced;
+  savePredictions();
   renderGroupTable();
   renderLeaderboard();
 }
@@ -718,6 +747,7 @@ function setKOPick(player, round, idx, team){
     if(!koPredictions[player][round]) koPredictions[player][round]={};
     koPredictions[player][round][idx]=team;
   }
+  savePredictions();
   renderKnockout();
   renderLeaderboard();
 }
@@ -790,6 +820,7 @@ function renderAll(){
 // ══════════════════════════════════════════════════════
 //  INIT
 // ══════════════════════════════════════════════════════
+loadPredictions();
 renderAll();
 fetchResults();
 </script>
