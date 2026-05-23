@@ -465,6 +465,21 @@ const OFB_MAP={
 };
 function ofbMap(n){return OFB_MAP[n]||n;}
 
+const KO_ROUND_MAP={
+  'Round of 32':'r32',
+  'Round of 16':'r16',
+  'Quarter-finals':'qf',
+  'Semi-finals':'sf',
+  'Final':'final'
+};
+
+function koWinner(m, hn, an){
+  const s=m.score;
+  if(s.p) return s.p[0]>s.p[1]?hn:an;  // penalty shootout
+  if(s.et) return s.et[0]>s.et[1]?hn:an; // extra time
+  return s.ft[0]>s.ft[1]?hn:an;          // normal time
+}
+
 function setStatus(msg,color){
   const el=document.getElementById('api-status');
   if(el){el.textContent=msg;el.style.color=color||'var(--muted)';}
@@ -477,11 +492,13 @@ async function fetchResults(){
     if(!res.ok) throw new Error('HTTP '+res.status);
     const data=await res.json();
 
-    // reset group scores
+    // reset results
     GK.forEach(g=>groupScores[g].forEach(m=>{m.sh='';m.sa='';}));
+    Object.assign(actualKO,{r32:{},r16:{},qf:{},sf:{},final:null});
 
     allFixtures=data.matches||[];
     let matchCount=0;
+    const koRoundCounts={r32:0,r16:0,qf:0,sf:0};
     (data.matches||[]).forEach(m=>{
       if(!m.score||!m.score.ft) return;
       const hn=ofbMap(m.team1), an=ofbMap(m.team2);
@@ -500,6 +517,17 @@ async function fetchResults(){
         const mi=grp.findIndex(x=>x.h===hi&&x.a===ai);
         if(mi===-1) return;
         grp[mi].sh=hs; grp[mi].sa=as_; matchCount++;
+      } else if(!m.group && m.round){
+        const round=KO_ROUND_MAP[m.round];
+        if(!round) return;
+        const winner=koWinner(m,hn,an);
+        if(round==='final'){
+          actualKO.final=winner;
+        } else {
+          const idx=koRoundCounts[round]++;
+          actualKO[round][idx]=winner;
+        }
+        matchCount++;
       }
     });
 
