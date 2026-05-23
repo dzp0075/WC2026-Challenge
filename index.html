@@ -176,6 +176,7 @@ table.ss td.result{font-weight:700;color:var(--acc2)}
   <button onclick="showPage('knockout',this)">&#9889; Knockout</button>
   <button onclick="showPage('fixtures',this)">&#128197; Fixtures</button>
   <button onclick="showPage('rules',this)">&#128218; Scoring Rules</button>
+  <button id="adminNavBtn" onclick="showPage('admin',this)" style="display:none">&#9881; Admin</button>
 </nav>
 
 <!-- ══ LEADERBOARD ══ -->
@@ -233,6 +234,13 @@ table.ss td.result{font-weight:700;color:var(--acc2)}
     </tr></thead>
     <tbody id="fixtureRows"><tr><td colspan="6" style="padding:1rem;color:var(--muted)">Loading fixtures...</td></tr></tbody>
   </table></div>
+</div>
+
+<!-- ══ ADMIN ══ -->
+<div id="admin" class="page">
+  <h2 class="page-title">Admin — Set Results</h2>
+  <p class="page-sub">Manually set results to test scoring. Access via index.html#admin</p>
+  <div id="adminContent"></div>
 </div>
 
 <!-- ══ RULES ══ -->
@@ -942,6 +950,7 @@ function showPage(id,btn){
   document.querySelectorAll('nav button').forEach(b=>b.classList.remove('active'));
   document.getElementById(id).classList.add('active');
   btn.classList.add('active');
+  if(id==='admin') renderAdmin();
 }
 
 function renderAll(){
@@ -951,11 +960,107 @@ function renderAll(){
 }
 
 // ══════════════════════════════════════════════════════
+//  ADMIN PANEL
+// ══════════════════════════════════════════════════════
+function setAdminGroup(g, pos, team){
+  if(!team) return;
+  const current=actualGroups[g]?[...actualGroups[g]]:[...GROUPS[g].teams];
+  const oldPos=current.indexOf(team);
+  if(oldPos!==-1) current[oldPos]=current[pos];
+  current[pos]=team;
+  actualGroups[g]=current;
+  // recompute 3rd-place advancers (simplified: mark top 8 by index order for testing)
+  thirdPlaceAdvancers.clear();
+  GK.filter(g=>actualGroups[g]).map(g=>({name:actualGroups[g][2]}))
+    .slice(0,8).forEach(t=>thirdPlaceAdvancers.add(t.name));
+  updateKOBracket();
+  renderAll();
+  renderAdmin();
+}
+
+function clearAdminGroup(g){
+  delete actualGroups[g];
+  updateKOBracket();
+  renderAll();
+  renderAdmin();
+}
+
+function setAdminKO(round, idx, team){
+  if(round==='final') actualKO.final=team||null;
+  else{ if(team) actualKO[round][idx]=team; else delete actualKO[round][idx]; }
+  renderAll();
+  renderAdmin();
+}
+
+function resetAllAdmin(){
+  GK.forEach(g=>delete actualGroups[g]);
+  Object.assign(actualKO,{r32:{},r16:{},qf:{},sf:{},final:null});
+  thirdPlaceAdvancers.clear();
+  updateKOBracket();
+  renderAll();
+  renderAdmin();
+}
+
+function renderAdmin(){
+  const el=document.getElementById('adminContent');
+  if(!el) return;
+  const sec=(title)=>`<h3 style="font-family:'Bebas Neue';font-size:18px;color:var(--accent);margin:1rem 0 .5rem;border-bottom:1px solid var(--border);padding-bottom:.25rem">${title}</h3>`;
+  const muted='style="font-size:11px;color:var(--muted);padding:3px 6px"';
+
+  let html=`<div style="margin-bottom:1rem"><button onclick="resetAllAdmin()" style="background:#3d0a0a;border:1px solid #7a1a1a;border-radius:var(--r);color:#ff8a8a;font-family:'Bebas Neue';font-size:14px;padding:6px 14px;cursor:pointer">Reset All Results</button></div>`;
+
+  // Group stage
+  html+=sec('Group Stage — Set Finishing Order');
+  html+='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:.5rem">';
+  GK.forEach(g=>{
+    const tms=GROUPS[g].teams;
+    const actual=actualGroups[g]||[];
+    html+=`<div style="background:var(--card);border:1px solid var(--border);border-radius:var(--r);padding:.6rem .75rem">`;
+    html+=`<div style="font-family:'Bebas Neue';color:var(--accent);margin-bottom:.4rem;display:flex;justify-content:space-between;align-items:center">Group ${g}`;
+    if(actualGroups[g]) html+=`<button onclick="clearAdminGroup('${g}')" style="font-size:10px;padding:2px 7px;background:var(--mid);border:1px solid var(--border);border-radius:3px;color:var(--muted);cursor:pointer">Clear</button>`;
+    html+='</div><div style="display:flex;gap:5px;flex-wrap:wrap">';
+    ['1st','2nd','3rd','4th'].forEach((lbl,pos)=>{
+      html+=`<select onchange="setAdminGroup('${g}',${pos},this.value)" style="font-size:11px;flex:1;min-width:0">
+        <option value="">${lbl}: --</option>
+        ${tms.map(t=>`<option value="${t}" ${actual[pos]===t?'selected':''}>${t}</option>`).join('')}
+      </select>`;
+    });
+    html+='</div></div>';
+  });
+  html+='</div>';
+
+  // Knockout stage
+  html+=sec('Knockout Stage — Set Match Winners');
+  [...KO_ROUNDS,'final'].forEach(round=>{
+    const label=round==='final'?'Final':KO_LABELS[round];
+    const count=round==='final'?1:koMatches[round].length;
+    html+=`<div style="margin-bottom:.75rem"><div style="font-size:12px;font-weight:600;color:var(--muted);margin-bottom:.3rem">${label}</div><div style="display:flex;gap:6px;flex-wrap:wrap">`;
+    for(let idx=0;idx<count;idx++){
+      const teams=getActualMatchTeams(round,idx);
+      const available=teams.filter(t=>t!=='TBD');
+      const actual=round==='final'?actualKO.final:actualKO[round]?.[idx];
+      if(available.length===0){
+        html+=`<span ${muted}>M${idx+1}: awaiting prev. round</span>`;
+      } else {
+        html+=`<select onchange="setAdminKO('${round}',${idx},this.value)" style="font-size:11px">
+          <option value="">M${idx+1}: --</option>
+          ${available.map(t=>`<option value="${t}" ${actual===t?'selected':''}>${t}</option>`).join('')}
+        </select>`;
+      }
+    }
+    html+='</div></div>';
+  });
+
+  el.innerHTML=html;
+}
+
+// ══════════════════════════════════════════════════════
 //  INIT
 // ══════════════════════════════════════════════════════
 loadPredictions();
 if(!currentPlayer||!PLAYERS.includes(currentPlayer)) showLogin();
 else updatePlayerDisplay();
+if(location.hash==='#admin') document.getElementById('adminNavBtn').style.display='';
 renderAll();
 fetchResults();
 </script>
