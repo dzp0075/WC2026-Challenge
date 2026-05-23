@@ -808,6 +808,7 @@ function renderKnockout(){
         const sel=available.length>0
           ?(isMe
             ?`<select onchange="setKOPick('${p}','${round}',${idx},this.value)">`
+              +`<option value="" ${!ppred?'selected':''}>--</option>`
               +available.map(t=>`<option value="${t}" ${ppred===t?'selected':''}>${t}</option>`).join('')
               +'</select>'
             :`<span style="font-size:11px">${ppred||'—'}</span>`)
@@ -843,10 +844,11 @@ function renderKnockout(){
 
 function setKOPick(player, round, idx, team){
   if(player!==currentPlayer) return;
-  if(round==='final') koPredictions[player].final=team;
+  const pick=team||null;
+  if(round==='final') koPredictions[player].final=pick;
   else{
     if(!koPredictions[player][round]) koPredictions[player][round]={};
-    koPredictions[player][round][idx]=team;
+    koPredictions[player][round][idx]=pick;
   }
   clearInvalidDownstreamPicks(player,round,idx);
   savePredictions();
