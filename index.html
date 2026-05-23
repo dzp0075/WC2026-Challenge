@@ -134,9 +134,29 @@ table.ss td.result{font-weight:700;color:var(--acc2)}
 ::-webkit-scrollbar{width:5px;height:5px}
 ::-webkit-scrollbar-track{background:var(--pitch)}
 ::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+
+/* LOGIN */
+#loginOverlay{position:fixed;inset:0;background:rgba(7,24,10,0.97);display:flex;align-items:center;justify-content:center;z-index:1000}
+#loginBox{background:var(--card);border:2px solid var(--border);border-radius:var(--r);padding:2rem;text-align:center;max-width:500px;width:90%}
+#loginBox h2{font-size:36px;color:var(--accent);margin-bottom:.4rem}
+#loginBox p{font-size:12px;color:var(--muted);margin-bottom:1.5rem}
+#loginGrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:.5rem}
+.login-btn{background:var(--mid);border:1px solid var(--border);border-radius:var(--r);color:var(--text);font-family:'Bebas Neue';font-size:18px;letter-spacing:.05em;padding:.6rem;cursor:pointer;transition:all .15s}
+.login-btn:hover{border-color:var(--accent);color:var(--accent)}
+.switch-btn{background:none;border:1px solid var(--border);border-radius:var(--r);color:var(--muted);font-size:11px;padding:4px 10px;cursor:pointer;transition:all .15s}
+.switch-btn:hover{border-color:var(--accent);color:var(--accent)}
 </style>
 </head>
 <body>
+
+<!-- ══ LOGIN OVERLAY ══ -->
+<div id="loginOverlay" style="display:none">
+  <div id="loginBox">
+    <h2>WHO ARE YOU?</h2>
+    <p>Select your name to manage your predictions</p>
+    <div id="loginGrid"></div>
+  </div>
+</div>
 
 <header>
   <div class="logo">
@@ -145,6 +165,8 @@ table.ss td.result{font-weight:700;color:var(--acc2)}
   </div>
   <div class="header-right">
     <span id="api-status" style="font-size:11px;color:var(--muted)"></span>
+    <span id="currentPlayerDisplay" style="font-size:12px;color:var(--accent);font-family:'Bebas Neue';letter-spacing:.05em"></span>
+    <button class="switch-btn" onclick="showLogin()">Switch Player</button>
   </div>
 </header>
 
@@ -370,6 +392,32 @@ function koPts(player,round){
   const n=koMatches[round].length;
   for(let i=0;i<n;i++) pts+=calcKOPoints(player,round,i);
   return pts;
+}
+
+// ══════════════════════════════════════════════════════
+//  PLAYER LOGIN
+// ══════════════════════════════════════════════════════
+let currentPlayer = localStorage.getItem('wc2026_player') || null;
+
+function showLogin(){
+  const grid=document.getElementById('loginGrid');
+  grid.innerHTML=PLAYERS.map(p=>
+    `<button class="login-btn" onclick="selectPlayer('${p}')">${p}</button>`
+  ).join('');
+  document.getElementById('loginOverlay').style.display='flex';
+}
+
+function selectPlayer(name){
+  currentPlayer=name;
+  localStorage.setItem('wc2026_player',name);
+  document.getElementById('loginOverlay').style.display='none';
+  updatePlayerDisplay();
+  renderAll();
+}
+
+function updatePlayerDisplay(){
+  const el=document.getElementById('currentPlayerDisplay');
+  if(el) el.textContent=currentPlayer?'Playing as '+currentPlayer:'';
 }
 
 // ══════════════════════════════════════════════════════
@@ -640,9 +688,12 @@ function renderGroupTable(){
         const predPos=pred.indexOf(teamName);
         const cls=predCellClass(p,g,predPos);
         const pts=predPts(p,g,predPos);
-        const select=`<select onchange="setPrediction('${p}','${g}',this.value,'${teamName}')">`
-          +displayOrder.map((t,i)=>`<option value="${i}" ${predPos===i?'selected':''}>${i+1}</option>`).join('')
-          +'</select>';
+        const isMe=p===currentPlayer;
+        const select=isMe
+          ?`<select onchange="setPrediction('${p}','${g}',this.value,'${teamName}')">`
+            +displayOrder.map((t,i)=>`<option value="${i}" ${predPos===i?'selected':''}>${i+1}</option>`).join('')
+            +'</select>'
+          :`<span style="font-weight:600">${predPos+1}</span>`;
         html+=`<td class="${cls}" style="font-size:11px">${select}</td>`
           +`<td class="${cls}" style="font-weight:700;font-size:11px">${pts||'?'}</td>`;
       });
@@ -664,6 +715,7 @@ function renderGroupTable(){
 }
 
 function setPrediction(player, g, newPosStr, teamName){
+  if(player!==currentPlayer) return;
   const newPos=parseInt(newPosStr);
   const pred=predictions[player][g];
   const oldPos=pred.indexOf(teamName);
@@ -707,10 +759,13 @@ function renderKnockout(){
         const ptsTxt=actual?(correct?pts:0):'?';
         // build dropdown of available teams
         const available=m.teams.filter(t=>t!=='TBD');
+        const isMe=p===currentPlayer;
         const sel=available.length>0
-          ?`<select onchange="setKOPick('${p}','${round}',${idx},this.value)">`
-            +available.map(t=>`<option value="${t}" ${ppred===t?'selected':''}>${t}</option>`).join('')
-            +'</select>'
+          ?(isMe
+            ?`<select onchange="setKOPick('${p}','${round}',${idx},this.value)">`
+              +available.map(t=>`<option value="${t}" ${ppred===t?'selected':''}>${t}</option>`).join('')
+              +'</select>'
+            :`<span style="font-size:11px">${ppred||'—'}</span>`)
           :'—';
         html+=`<td class="${cls}" style="font-size:11px">${sel}</td>`
           +`<td class="${cls}" style="font-weight:700;font-size:11px">${ptsTxt}</td>`;
@@ -742,6 +797,7 @@ function renderKnockout(){
 }
 
 function setKOPick(player, round, idx, team){
+  if(player!==currentPlayer) return;
   if(round==='final') koPredictions[player].final=team;
   else{
     if(!koPredictions[player][round]) koPredictions[player][round]={};
@@ -821,6 +877,8 @@ function renderAll(){
 //  INIT
 // ══════════════════════════════════════════════════════
 loadPredictions();
+if(!currentPlayer||!PLAYERS.includes(currentPlayer)) showLogin();
+else updatePlayerDisplay();
 renderAll();
 fetchResults();
 </script>
