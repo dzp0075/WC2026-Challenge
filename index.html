@@ -176,7 +176,7 @@ table.ss td.result{font-weight:700;color:var(--acc2)}
   <button onclick="showPage('knockout',this)">&#9889; Knockout</button>
   <button onclick="showPage('fixtures',this)">&#128197; Fixtures</button>
   <button onclick="showPage('rules',this)">&#128218; Scoring Rules</button>
-  <button id="adminNavBtn" onclick="showPage('admin',this)">&#9881; Admin</button>
+  <button id="adminNavBtn" onclick="showPage('admin',this)" style="display:none">&#9881; Admin</button>
 </nav>
 
 <!-- ══ LEADERBOARD ══ -->
@@ -1060,6 +1060,7 @@ function renderAdmin(){
 loadPredictions();
 if(!currentPlayer||!PLAYERS.includes(currentPlayer)) showLogin();
 else updatePlayerDisplay();
+if(location.hash==='#admin') document.getElementById('adminNavBtn').style.display='';
 renderAll();
 fetchResults();
 </script>
