@@ -730,6 +730,50 @@ function setPrediction(player, g, newPosStr, teamName){
 }
 
 // ══════════════════════════════════════════════════════
+//  KNOCKOUT BRACKET HELPERS
+// ══════════════════════════════════════════════════════
+function getActualWinner(round, idx){
+  return round==='final'?actualKO.final:(actualKO[round]?.[idx]||null);
+}
+
+function getActualMatchTeams(round, matchIdx){
+  if(round==='r32') return koMatches.r32[matchIdx].teams;
+  if(round==='final') return [getActualWinner('sf',0)||'TBD',getActualWinner('sf',1)||'TBD'];
+  const prev={r16:'r32',qf:'r16',sf:'qf'}[round];
+  return [getActualWinner(prev,matchIdx*2)||'TBD',getActualWinner(prev,matchIdx*2+1)||'TBD'];
+}
+
+function getPlayerWinner(player, round, idx){
+  const actual=getActualWinner(round,idx);
+  if(actual) return actual;
+  return (round==='final'?koPredictions[player].final:(koPredictions[player][round]||{})[idx])||null;
+}
+
+function getPlayerMatchTeams(player, round, matchIdx){
+  if(round==='r32') return koMatches.r32[matchIdx].teams;
+  if(round==='final') return [getPlayerWinner(player,'sf',0)||'TBD',getPlayerWinner(player,'sf',1)||'TBD'];
+  const prev={r16:'r32',qf:'r16',sf:'qf'}[round];
+  return [getPlayerWinner(player,prev,matchIdx*2)||'TBD',getPlayerWinner(player,prev,matchIdx*2+1)||'TBD'];
+}
+
+function clearInvalidDownstreamPicks(player, changedRound, changedIdx){
+  const progression=['r32','r16','qf','sf','final'];
+  const start=progression.indexOf(changedRound);
+  let affectedIdx=changedIdx;
+  for(let ri=start+1;ri<progression.length;ri++){
+    const round=progression[ri];
+    affectedIdx=round==='final'?0:Math.floor(affectedIdx/2);
+    const currentPick=round==='final'?koPredictions[player].final:(koPredictions[player][round]||{})[affectedIdx];
+    if(!currentPick) break;
+    const teams=getPlayerMatchTeams(player,round,affectedIdx);
+    if(!teams.includes(currentPick)){
+      if(round==='final') koPredictions[player].final=null;
+      else{ if(!koPredictions[player][round]) koPredictions[player][round]={}; koPredictions[player][round][affectedIdx]=null; }
+    } else break;
+  }
+}
+
+// ══════════════════════════════════════════════════════
 //  RENDER KNOCKOUT
 // ══════════════════════════════════════════════════════
 function renderKnockout(){
@@ -749,7 +793,8 @@ function renderKnockout(){
 
     matches.forEach((m,idx)=>{
       const actual=round==='final'?actualKO.final:actualKO[round][idx];
-      const matchLabel=m.teams[0]==='TBD'?'TBD vs TBD':`${dn(m.teams[0])} vs ${dn(m.teams[1])}`;
+      const labelTeams=getActualMatchTeams(round,idx);
+      const matchLabel=labelTeams[0]==='TBD'?`Match ${idx+1}`:`${dn(labelTeams[0])} vs ${dn(labelTeams[1])}`;
       html+=`<tr><td class="left" style="font-size:11px">${matchLabel}</td>`;
       html+=`<td class="result">${actual?dn(actual):'—'}</td>`;
       PLAYERS.forEach(p=>{
@@ -757,8 +802,8 @@ function renderKnockout(){
         const correct=actual&&ppred===actual;
         const cls=actual?(correct?'pred-15':'pred-0'):'pred-p';
         const ptsTxt=actual?(correct?pts:0):'?';
-        // build dropdown of available teams
-        const available=m.teams.filter(t=>t!=='TBD');
+        const playerTeams=getPlayerMatchTeams(p,round,idx);
+        const available=playerTeams.filter(t=>t!=='TBD');
         const isMe=p===currentPlayer;
         const sel=available.length>0
           ?(isMe
@@ -766,7 +811,7 @@ function renderKnockout(){
               +available.map(t=>`<option value="${t}" ${ppred===t?'selected':''}>${t}</option>`).join('')
               +'</select>'
             :`<span style="font-size:11px">${ppred||'—'}</span>`)
-          :'—';
+          :(isMe?'<span style="color:var(--muted);font-size:10px">pick prev. round first</span>':'—');
         html+=`<td class="${cls}" style="font-size:11px">${sel}</td>`
           +`<td class="${cls}" style="font-weight:700;font-size:11px">${ptsTxt}</td>`;
       });
@@ -803,6 +848,7 @@ function setKOPick(player, round, idx, team){
     if(!koPredictions[player][round]) koPredictions[player][round]={};
     koPredictions[player][round][idx]=team;
   }
+  clearInvalidDownstreamPicks(player,round,idx);
   savePredictions();
   renderKnockout();
   renderLeaderboard();
