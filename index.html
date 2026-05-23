@@ -5,7 +5,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>WC 2026 Predictor</title>
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
-<script type="module" src="https://widgets.api-sports.io/3.1.0/widgets.js"></script>
 <style>
 :root {
   --pitch:#07180a; --mid:#0c2210; --card:#0f2914; --border:#1d4125;
@@ -54,10 +53,6 @@ nav button.active{color:var(--accent);border-bottom-color:var(--accent)}
 @keyframes fadeIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
 .page-title{font-size:26px;color:var(--accent);margin-bottom:.25rem}
 .page-sub{font-size:11px;color:var(--muted);font-style:italic;margin-bottom:1rem}
-
-/* WIDGET WRAPPER */
-.widget-panel{background:var(--card);border:1px solid var(--border);border-radius:var(--r);overflow:hidden}
-.widget-body{padding:10px}
 
 /* ===================== SPREADSHEET TABLES ===================== */
 .ss-wrap{overflow-x:auto;border-radius:var(--r);border:1px solid var(--border)}
@@ -156,10 +151,6 @@ table.ss td.result{font-weight:700;color:var(--acc2)}
 </head>
 <body>
 
-<api-sports-widget data-type="config" data-key="7c32a03b53a7def39a4c8f87c6b773fc"
-  data-sport="football" data-lang="en" data-theme="dark" data-show-logos="true"
-  data-refresh="60" data-target-game="modal" data-target-standings="modal"></api-sports-widget>
-
 <header>
   <div class="logo">
     <div class="logo-icon">&#x26BD;</div>
@@ -174,8 +165,6 @@ table.ss td.result{font-weight:700;color:var(--acc2)}
   <button class="active" onclick="showPage('leaderboard',this)">&#127942; Leaderboard</button>
   <button onclick="showPage('groups',this)">&#128202; Group Stage</button>
   <button onclick="showPage('knockout',this)">&#9889; Knockout</button>
-  <button onclick="showPage('live',this)">&#128308; Live Scores</button>
-  <button onclick="showPage('standings',this)">&#128200; Standings</button>
   <button onclick="showPage('fixtures',this)">&#128197; Fixtures</button>
   <button onclick="showPage('rules',this)">&#128218; Scoring Rules</button>
 </nav>
@@ -209,24 +198,6 @@ table.ss td.result{font-weight:700;color:var(--acc2)}
   <h2 class="page-title">Knockout Stage Predictions</h2>
   <p class="page-sub">R16: 20pts &middot; QF: 30pts &middot; SF: 40pts &middot; Final: 50pts per correct pick</p>
   <div id="koContent"></div>
-</div>
-
-<!-- ══ LIVE ══ -->
-<div id="live" class="page">
-  <h2 class="page-title">Live Scores</h2>
-  <p class="page-sub">Auto-refreshes every 60s</p>
-  <div class="widget-panel"><div class="widget-body">
-    <api-sports-widget data-type="games" data-league="1" data-season="2026"></api-sports-widget>
-  </div></div>
-</div>
-
-<!-- ══ STANDINGS ══ -->
-<div id="standings" class="page">
-  <h2 class="page-title">Group Standings</h2>
-  <p class="page-sub">Official live standings from API-Football</p>
-  <div class="widget-panel"><div class="widget-body">
-    <api-sports-widget data-type="standings" data-league="1" data-season="2026"></api-sports-widget>
-  </div></div>
 </div>
 
 <!-- ══ FIXTURES ══ -->
