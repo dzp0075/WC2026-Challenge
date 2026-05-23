@@ -145,6 +145,26 @@ table.ss td.result{font-weight:700;color:var(--acc2)}
 .login-btn:hover{border-color:var(--accent);color:var(--accent)}
 .switch-btn{background:none;border:1px solid var(--border);border-radius:var(--r);color:var(--muted);font-size:11px;padding:4px 10px;cursor:pointer;transition:all .15s}
 .switch-btn:hover{border-color:var(--accent);color:var(--accent)}
+.switch-btn.on{color:var(--accent);border-color:var(--accent)}
+
+/* MY PICKS ONLY — hides other players' columns */
+body.my-picks-only table.ss [data-me="false"]{display:none}
+
+/* MOBILE */
+@media(max-width:680px){
+  .page{padding:.75rem .6rem}
+  header{padding:0 .6rem;height:46px}
+  .logo small{display:none}
+  .logo h1{font-size:16px}
+  #currentPlayerDisplay{max-width:80px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  nav button{padding:10px 13px;font-size:13px}
+  .lb-grid{grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:.4rem}
+  .lb-breakdown{display:none}
+  #loginGrid{grid-template-columns:repeat(2,1fr)}
+  .ss-wrap{-webkit-overflow-scrolling:touch}
+  .page-title{font-size:20px}
+  .rules-grid{grid-template-columns:repeat(auto-fill,minmax(140px,1fr))}
+}
 </style>
 </head>
 <body>
@@ -166,7 +186,8 @@ table.ss td.result{font-weight:700;color:var(--acc2)}
   <div class="header-right">
     <span id="api-status" style="font-size:11px;color:var(--muted)"></span>
     <span id="currentPlayerDisplay" style="font-size:12px;color:var(--accent);font-family:'Bebas Neue';letter-spacing:.05em"></span>
-    <button class="switch-btn" onclick="showLogin()">Switch Player</button>
+    <button class="switch-btn" id="myPicksBtn" onclick="toggleMyPicks(this)">My Picks</button>
+    <button class="switch-btn" onclick="showLogin()">Switch</button>
   </div>
 </header>
 
@@ -414,6 +435,19 @@ function selectPlayer(name){
   document.getElementById('loginOverlay').style.display='none';
   updatePlayerDisplay();
   renderAll();
+}
+
+let myPicksOnly=false;
+function toggleMyPicks(btn){
+  myPicksOnly=!myPicksOnly;
+  document.body.classList.toggle('my-picks-only',myPicksOnly);
+  btn.classList.toggle('on',myPicksOnly);
+}
+function setMyPicksOnly(on){
+  myPicksOnly=on;
+  document.body.classList.toggle('my-picks-only',on);
+  const btn=document.getElementById('myPicksBtn');
+  if(btn) btn.classList.toggle('on',on);
 }
 
 function updatePlayerDisplay(){
@@ -675,7 +709,7 @@ function renderGroupTable(){
   let html='<thead><tr>'
     +'<th class="left" colspan="2">Group / Team</th>'
     +'<th>W</th><th>D</th><th>L</th><th>GD</th><th>Pts</th>';
-  PLAYERS.forEach(p=>html+=`<th>${p}</th><th style="font-size:10px;color:var(--muted)">pts</th>`);
+  PLAYERS.forEach(p=>{const dm=`data-me="${p===currentPlayer}"`;html+=`<th ${dm}>${p}</th><th ${dm} style="font-size:10px;color:var(--muted)">pts</th>`;});
   html+='</tr></thead><tbody>';
 
   GK.forEach(g=>{
@@ -697,7 +731,7 @@ function renderGroupTable(){
       +'<td colspan="5" style="font-size:10px;color:var(--muted)">Group Points</td>';
     PLAYERS.forEach(p=>{
       const gp=calcGroupPoints(p,g);
-      html+=`<td class="pts-cell" colspan="2">${gp}</td>`;
+      html+=`<td data-me="${p===currentPlayer}" class="pts-cell" colspan="2">${gp}</td>`;
     });
     html+='</tr>';
 
@@ -723,8 +757,8 @@ function renderGroupTable(){
             +displayOrder.map((t,i)=>`<option value="${i}" ${predPos===i?'selected':''}>${i+1}</option>`).join('')
             +'</select>'
           :`<span style="font-weight:600">${predPos+1}</span>`;
-        html+=`<td class="${cls}" style="font-size:11px">${select}</td>`
-          +`<td class="${cls}" style="font-weight:700;font-size:11px">${pts||'?'}</td>`;
+        html+=`<td data-me="${p===currentPlayer}" class="${cls}" style="font-size:11px">${select}</td>`
+          +`<td data-me="${p===currentPlayer}" class="${cls}" style="font-weight:700;font-size:11px">${pts||'?'}</td>`;
       });
       html+='</tr>';
     });
@@ -736,7 +770,7 @@ function renderGroupTable(){
     +'<td class="left" colspan="7" style="font-family:\'Bebas Neue\';font-size:13px;color:var(--accent)">Total Group Points</td>';
   PLAYERS.forEach(p=>{
     const gp=groupPts(p);
-    html+=`<td class="pts-cell" colspan="2">${gp}</td>`;
+    html+=`<td data-me="${p===currentPlayer}" class="pts-cell" colspan="2">${gp}</td>`;
   });
   html+='</tr>';
 
@@ -817,7 +851,7 @@ function renderKnockout(){
     html+=`<div class="ko-section"><div class="ko-round-title">${label} <span style="font-size:13px;font-family:'DM Sans';color:var(--muted);font-weight:400">${pts} pts each</span></div>`;
     html+='<div class="ss-wrap"><table class="ss">';
     html+='<thead><tr><th class="left" style="min-width:120px">Match</th><th>Result</th>';
-    PLAYERS.forEach(p=>html+=`<th>${p}</th><th style="font-size:10px;color:var(--muted)">pts</th>`);
+    PLAYERS.forEach(p=>{const dm=`data-me="${p===currentPlayer}"`;html+=`<th ${dm}>${p}</th><th ${dm} style="font-size:10px;color:var(--muted)">pts</th>`;});
     html+='</tr></thead><tbody>';
 
     matches.forEach((m,idx)=>{
@@ -842,8 +876,8 @@ function renderKnockout(){
               +'</select>'
             :`<span style="font-size:11px">${ppred||'—'}</span>`)
           :(isMe?'<span style="color:var(--muted);font-size:10px">pick prev. round first</span>':'—');
-        html+=`<td class="${cls}" style="font-size:11px">${sel}</td>`
-          +`<td class="${cls}" style="font-weight:700;font-size:11px">${ptsTxt}</td>`;
+        html+=`<td data-me="${p===currentPlayer}" class="${cls}" style="font-size:11px">${sel}</td>`
+          +`<td data-me="${p===currentPlayer}" class="${cls}" style="font-weight:700;font-size:11px">${ptsTxt}</td>`;
       });
       html+='</tr>';
     });
@@ -853,7 +887,7 @@ function renderKnockout(){
       +'<td class="left" colspan="2" style="font-family:\'Bebas Neue\';font-size:12px;color:var(--accent)">Round Points</td>';
     PLAYERS.forEach(p=>{
       const rpts=koPts(p,round);
-      html+=`<td class="pts-cell" colspan="2">${rpts}</td>`;
+      html+=`<td data-me="${p===currentPlayer}" class="pts-cell" colspan="2">${rpts}</td>`;
     });
     html+='</tr>';
 
@@ -864,7 +898,7 @@ function renderKnockout(){
   html+='<div class="ss-wrap" style="margin-top:.5rem"><table class="ss"><tbody><tr>'
     +'<td class="left" colspan="2" style="font-family:\'Bebas Neue\';font-size:14px;color:var(--accent);background:var(--mid)">TOTAL POINTS</td>';
   PLAYERS.forEach(p=>{
-    html+=`<td class="pts-cell" colspan="2" style="background:var(--mid);font-size:14px">${totalPoints(p)}</td>`;
+    html+=`<td data-me="${p===currentPlayer}" class="pts-cell" colspan="2" style="background:var(--mid);font-size:14px">${totalPoints(p)}</td>`;
   });
   html+='</tr></tbody></table></div>';
 
@@ -956,6 +990,7 @@ function renderAll(){
 loadPredictions();
 if(!currentPlayer||!PLAYERS.includes(currentPlayer)) showLogin();
 else updatePlayerDisplay();
+setMyPicksOnly(window.innerWidth<768);
 renderAll();
 fetchResults();
 </script>
