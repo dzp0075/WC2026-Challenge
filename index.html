@@ -19,7 +19,8 @@
   --c-pending: #1a1a2e; /* not yet decided */
 }
 *{box-sizing:border-box;margin:0;padding:0}
-html,body{height:100%;font-size:13px}
+html,body{font-size:13px}
+body{-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale}
 body{background:var(--pitch);color:var(--text);font-family:'DM Sans',sans-serif;
   background-image:radial-gradient(ellipse at 50% 0%,rgba(245,197,24,0.03) 0%,transparent 60%)}
 h1,h2,h3{font-family:'Bebas Neue',sans-serif;letter-spacing:0.05em}
@@ -136,34 +137,79 @@ table.ss td.result{font-weight:700;color:var(--acc2)}
 ::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
 
 /* LOGIN */
-#loginOverlay{position:fixed;inset:0;background:rgba(7,24,10,0.97);display:flex;align-items:center;justify-content:center;z-index:1000}
-#loginBox{background:var(--card);border:2px solid var(--border);border-radius:var(--r);padding:2rem;text-align:center;max-width:500px;width:90%}
+#loginOverlay{position:fixed;inset:0;background:rgba(7,24,10,0.95);display:flex;align-items:center;justify-content:center;z-index:1000;padding:16px}
+#loginBox{
+  background:linear-gradient(180deg,rgba(255,255,255,.04),rgba(0,0,0,.2));
+  border:1px solid var(--border);border-radius:16px;padding:2rem;text-align:center;
+  max-width:500px;width:100%;
+  box-shadow:0 24px 64px rgba(0,0,0,.6);
+}
 #loginBox h2{font-size:36px;color:var(--accent);margin-bottom:.4rem}
 #loginBox p{font-size:12px;color:var(--muted);margin-bottom:1.5rem}
 #loginGrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:.5rem}
-.login-btn{background:var(--mid);border:1px solid var(--border);border-radius:var(--r);color:var(--text);font-family:'Bebas Neue';font-size:18px;letter-spacing:.05em;padding:.6rem;cursor:pointer;transition:all .15s}
-.login-btn:hover{border-color:var(--accent);color:var(--accent)}
-.switch-btn{background:none;border:1px solid var(--border);border-radius:var(--r);color:var(--muted);font-size:11px;padding:4px 10px;cursor:pointer;transition:all .15s}
-.switch-btn:hover{border-color:var(--accent);color:var(--accent)}
-.switch-btn.on{color:var(--accent);border-color:var(--accent)}
+.login-btn{
+  background:rgba(0,0,0,.25);border:1px solid var(--border);border-radius:12px;
+  color:var(--text);font-family:'Bebas Neue';font-size:18px;letter-spacing:.05em;
+  padding:.75rem;cursor:pointer;transition:all .15s;min-height:48px;
+}
+.login-btn:hover,.login-btn:active{border-color:var(--accent);color:var(--accent);background:rgba(245,197,24,.07)}
+.switch-btn{
+  background:rgba(0,0,0,.2);border:1px solid var(--border);border-radius:10px;
+  color:var(--muted);font-size:11px;padding:7px 12px;cursor:pointer;transition:all .15s;
+}
+.switch-btn:hover,.switch-btn:active{border-color:var(--accent);color:var(--accent)}
+.switch-btn.on{color:var(--accent);border-color:var(--accent);background:rgba(245,197,24,.07)}
 
 /* MY PICKS ONLY — hides other players' columns */
 body.my-picks-only table.ss [data-me="false"]{display:none}
 
-/* MOBILE */
+/* ── MOBILE ── */
 @media(max-width:680px){
-  .page{padding:.75rem .6rem}
-  header{padding:0 .6rem;height:46px}
+  /* layout */
+  .page{padding:.75rem .75rem;padding-bottom:72px}
+  .page-title{font-size:21px}
+  .page-sub{font-size:11px}
+
+  /* header */
+  header{padding:0 .75rem;height:48px}
+  .logo-icon{width:28px;height:28px;font-size:15px}
+  .logo h1{font-size:15px}
   .logo small{display:none}
-  .logo h1{font-size:16px}
-  #currentPlayerDisplay{max-width:80px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  nav button{padding:10px 13px;font-size:13px}
-  .lb-grid{grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:.4rem}
+  #api-status{display:none}
+  #currentPlayerDisplay{font-size:11px;max-width:72px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .switch-btn{padding:7px 10px;font-size:11px}
+
+  /* nav — hide scrollbar, keep scroll */
+  nav{scrollbar-width:none}
+  nav::-webkit-scrollbar{display:none}
+  nav{-webkit-overflow-scrolling:touch}
+  nav button{padding:12px 15px;font-size:13px}
+
+  /* leaderboard cards */
+  .lb-grid{grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:.5rem}
+  .lb-card{border-radius:12px;padding:.75rem}
+  .lb-rank{font-size:24px}
+  .lb-name{font-size:13px}
+  .lb-pts{font-size:19px}
   .lb-breakdown{display:none}
-  #loginGrid{grid-template-columns:repeat(2,1fr)}
-  .ss-wrap{-webkit-overflow-scrolling:touch}
-  .page-title{font-size:20px}
+
+  /* login */
+  #loginBox{padding:1.5rem;border-radius:16px}
+  #loginGrid{grid-template-columns:repeat(2,1fr);gap:.5rem}
+  .login-btn{font-size:19px;padding:.8rem;border-radius:12px}
+
+  /* tables */
+  .ss-wrap{-webkit-overflow-scrolling:touch;border-radius:10px}
+  table.ss{font-size:11px}
+  table.ss td,table.ss th{padding:5px 6px}
+
+  /* selects inside table cells stay tight; other selects get bigger */
+  select{padding:8px 7px;border-radius:8px;font-size:13px;min-height:40px}
+  table.ss select{padding:4px 3px;border-radius:5px;font-size:11px;min-height:unset}
+
+  /* rules */
   .rules-grid{grid-template-columns:repeat(auto-fill,minmax(140px,1fr))}
+  .rule-card{border-radius:12px}
 }
 </style>
 </head>
