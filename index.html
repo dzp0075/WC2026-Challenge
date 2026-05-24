@@ -678,7 +678,8 @@ async function fetchResults(){
 
 function updateKOBracket(){
   const q=GK.map(g=>{
-    const a=actualGroups[g]||GROUPS[g].teams;
+    const a=actualGroups[g];
+    if(!a) return['TBD','TBD','TBD'];
     return[a[0]||'TBD',a[1]||'TBD',a[2]||'TBD'];
   });
   const pairs=[
@@ -878,7 +879,22 @@ function getPlayerWinner(player, round, idx){
 }
 
 function getPlayerMatchTeams(player, round, matchIdx){
-  if(round==='r32') return koMatches.r32[matchIdx].teams;
+  if(round==='r32'){
+    // use actual group results if available, else fall back to this player's group predictions
+    const q=GK.map(g=>{
+      const a=actualGroups[g];
+      if(a) return[a[0]||'TBD',a[1]||'TBD',a[2]||'TBD'];
+      const pred=predictions[player][g];
+      return[pred[0]||'TBD',pred[1]||'TBD',pred[2]||'TBD'];
+    });
+    const pairs=[
+      [q[0][0],q[1][1]],[q[1][0],q[0][1]],[q[2][0],q[3][1]],[q[3][0],q[2][1]],
+      [q[4][0],q[5][1]],[q[5][0],q[4][1]],[q[6][0],q[7][1]],[q[7][0],q[6][1]],
+      [q[8][0],q[9][1]],[q[9][0],q[8][1]],[q[10][0],q[11][1]],[q[11][0],q[10][1]],
+      [q[0][2],q[3][2]],[q[1][2],q[2][2]],[q[4][2],q[7][2]],[q[5][2],q[6][2]]
+    ];
+    return pairs[matchIdx];
+  }
   if(round==='final') return [getPlayerWinner(player,'sf',0)||'TBD',getPlayerWinner(player,'sf',1)||'TBD'];
   const prev={r16:'r32',qf:'r16',sf:'qf'}[round];
   return [getPlayerWinner(player,prev,matchIdx*2)||'TBD',getPlayerWinner(player,prev,matchIdx*2+1)||'TBD'];
