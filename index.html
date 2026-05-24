@@ -96,6 +96,7 @@ table.ss tr:hover td{background:rgba(255,255,255,0.02)}
 .lb-card{
   background:var(--card);border:1px solid var(--border);border-radius:var(--r);
   padding:.75rem 1rem;display:flex;flex-direction:column;gap:4px;
+  box-shadow:0 2px 12px rgba(0,0,0,.4);
 }
 .lb-card.gold{border-color:#f5c518;background:rgba(245,197,24,0.08)}
 .lb-card.silver{border-color:#b0b0b0;background:rgba(176,176,176,0.06)}
@@ -166,50 +167,65 @@ body.my-picks-only table.ss [data-me="false"]{display:none}
 /* ── MOBILE ── */
 @media(max-width:680px){
   /* layout */
-  .page{padding:.75rem .75rem;padding-bottom:72px}
-  .page-title{font-size:21px}
-  .page-sub{font-size:11px}
+  .page{padding:.75rem .75rem;padding-bottom:80px}
+  .page-title{font-size:22px}
+  .page-sub{font-size:11px;margin-bottom:.75rem}
 
   /* header */
   header{padding:0 .75rem;height:48px}
   .logo-icon{width:28px;height:28px;font-size:15px}
-  .logo h1{font-size:15px}
+  .logo h1{font-size:16px}
   .logo small{display:none}
   #api-status{display:none}
-  #currentPlayerDisplay{font-size:11px;max-width:72px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .switch-btn{padding:7px 10px;font-size:11px}
+  #currentPlayerDisplay{font-size:11px;max-width:80px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .switch-btn{padding:6px 10px;font-size:11px;border-radius:8px}
 
   /* nav — hide scrollbar, keep scroll */
   nav{scrollbar-width:none}
   nav::-webkit-scrollbar{display:none}
   nav{-webkit-overflow-scrolling:touch}
-  nav button{padding:12px 15px;font-size:13px}
+  nav button{padding:11px 14px;font-size:13px}
 
-  /* leaderboard cards */
-  .lb-grid{grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:.5rem}
-  .lb-card{border-radius:12px;padding:.75rem}
-  .lb-rank{font-size:24px}
+  /* leaderboard cards — show breakdown, bigger shadow */
+  .lb-grid{grid-template-columns:repeat(2,1fr);gap:.6rem}
+  .lb-card{
+    border-radius:14px;padding:.875rem;
+    box-shadow:0 6px 24px rgba(0,0,0,.55);
+    background:linear-gradient(160deg,rgba(255,255,255,.05),rgba(0,0,0,.15));
+  }
+  .lb-rank{font-size:26px}
   .lb-name{font-size:13px}
-  .lb-pts{font-size:19px}
-  .lb-breakdown{display:none}
+  .lb-pts{font-size:20px}
+  .lb-breakdown{display:block;font-size:10px;line-height:1.6;margin-top:2px}
+
+  /* leaderboard summary table — hide on mobile, cards are enough */
+  #leaderboard .ss-wrap{display:none}
 
   /* login */
-  #loginBox{padding:1.5rem;border-radius:16px}
+  #loginBox{padding:1.5rem 1.25rem;border-radius:16px}
   #loginGrid{grid-template-columns:repeat(2,1fr);gap:.5rem}
-  .login-btn{font-size:19px;padding:.8rem;border-radius:12px}
+  .login-btn{font-size:18px;padding:.8rem;border-radius:12px}
 
-  /* tables */
+  /* tables — allow them to shrink when my-picks-only is active */
   .ss-wrap{-webkit-overflow-scrolling:touch;border-radius:10px}
-  table.ss{font-size:11px}
+  table.ss{font-size:11px;min-width:unset}
+  table.ss td.team-name{min-width:90px}
   table.ss td,table.ss th{padding:5px 6px}
+
+  /* hide stat & venue columns on mobile to save space */
+  table.ss .mob-hide{display:none}
 
   /* selects inside table cells stay tight; other selects get bigger */
   select{padding:8px 7px;border-radius:8px;font-size:13px;min-height:40px}
   table.ss select{padding:4px 3px;border-radius:5px;font-size:11px;min-height:unset}
 
+  /* ko section spacing */
+  .ko-section{margin-bottom:1rem}
+  .ko-round-title{font-size:16px}
+
   /* rules */
-  .rules-grid{grid-template-columns:repeat(auto-fill,minmax(140px,1fr))}
-  .rule-card{border-radius:12px}
+  .rules-grid{grid-template-columns:repeat(2,1fr);gap:.5rem}
+  .rule-card{border-radius:12px;box-shadow:0 4px 12px rgba(0,0,0,.4)}
 }
 </style>
 </head>
@@ -294,9 +310,9 @@ body.my-picks-only table.ss [data-me="false"]{display:none}
   </div>
   <div class="ss-wrap"><table class="ss" id="fixturesTable">
     <thead><tr>
-      <th class="left">Date</th><th class="left">Round / Group</th>
+      <th class="left">Date</th><th class="left mob-hide">Round / Group</th>
       <th class="left">Home</th><th>Score</th><th class="left">Away</th>
-      <th class="left">Venue</th>
+      <th class="left mob-hide">Venue</th>
     </tr></thead>
     <tbody id="fixtureRows"><tr><td colspan="6" style="padding:1rem;color:var(--muted)">Loading fixtures...</td></tr></tbody>
   </table></div>
@@ -754,7 +770,7 @@ function renderGroupTable(){
   const tbl=document.getElementById('groupTable');
   let html='<thead><tr>'
     +'<th class="left" colspan="2">Group / Team</th>'
-    +'<th>W</th><th>D</th><th>L</th><th>GD</th><th>Pts</th>';
+    +'<th class="mob-hide">W</th><th class="mob-hide">D</th><th class="mob-hide">L</th><th class="mob-hide">GD</th><th>Pts</th>';
   PLAYERS.forEach(p=>{const dm=`data-me="${p===currentPlayer}"`;html+=`<th ${dm}>${p}</th><th ${dm} style="font-size:10px;color:var(--muted)">pts</th>`;});
   html+='</tr></thead><tbody>';
 
@@ -774,7 +790,8 @@ function renderGroupTable(){
     });
     // group header row showing total pts per player
     html+=`<tr class="group-header"><td class="left" colspan="2">Group ${g}${actual?' *Complete':''}</td>`
-      +'<td colspan="5" style="font-size:10px;color:var(--muted)">Group Points</td>';
+      +'<td class="mob-hide" colspan="4" style="font-size:10px;color:var(--muted)">Stats</td>'
+      +'<td style="font-size:10px;color:var(--muted)">Pts</td>';
     PLAYERS.forEach(p=>{
       const gp=calcGroupPoints(p,g);
       html+=`<td data-me="${p===currentPlayer}" class="pts-cell" colspan="2">${gp}</td>`;
@@ -788,8 +805,8 @@ function renderGroupTable(){
       const rowStyle=actual&&pos<2?'border-left:3px solid var(--win-border)':'';
       html+=`<tr><td style="width:22px;text-align:center;padding:4px;font-size:16px">${flag(teamName)}</td>`
         +`<td class="team-name" style="${rowStyle}">${teamName}</td>`
-        +`<td>${st.w}</td><td>${st.d}</td><td>${st.l}</td>`
-        +`<td>${st.gd>0?'+':''}${st.gd}</td><td class="pts-cell">${st.pts}</td>`;
+        +`<td class="mob-hide">${st.w}</td><td class="mob-hide">${st.d}</td><td class="mob-hide">${st.l}</td>`
+        +`<td class="mob-hide">${st.gd>0?'+':''}${st.gd}</td><td class="pts-cell">${st.pts}</td>`;
 
       PLAYERS.forEach(p=>{
         // find where this player predicted this team
@@ -813,7 +830,9 @@ function renderGroupTable(){
 
   // totals row
   html+='<tr style="background:var(--mid);border-top:2px solid var(--border)">'
-    +'<td class="left" colspan="7" style="font-family:\'Bebas Neue\';font-size:13px;color:var(--accent)">Total Group Points</td>';
+    +'<td class="left" colspan="2" style="font-family:\'Bebas Neue\';font-size:13px;color:var(--accent)">Total Group Points</td>'
+    +'<td class="mob-hide" colspan="4"></td>'
+    +'<td></td>';
   PLAYERS.forEach(p=>{
     const gp=groupPts(p);
     html+=`<td data-me="${p===currentPlayer}" class="pts-cell" colspan="2">${gp}</td>`;
@@ -1005,11 +1024,11 @@ function renderFixtures(){
     const rowStyle=hasScore?'':'opacity:0.75';
     return `<tr style="${rowStyle}">
       <td class="left" style="white-space:nowrap;color:var(--muted)">${fmt(m.date)}</td>
-      <td class="left" style="font-size:11px;color:var(--muted)">${roundLabel}</td>
+      <td class="left mob-hide" style="font-size:11px;color:var(--muted)">${roundLabel}</td>
       <td class="left"><span style="margin-right:4px">${flag(ofbMap(m.team1))}</span>${ofbMap(m.team1)}</td>
-      <td style="font-size:13px;min-width:60px">${score}</td>
+      <td style="font-size:13px;min-width:50px">${score}</td>
       <td class="left"><span style="margin-right:4px">${flag(ofbMap(m.team2))}</span>${ofbMap(m.team2)}</td>
-      <td class="left" style="font-size:11px;color:var(--muted)">${venue}</td>
+      <td class="left mob-hide" style="font-size:11px;color:var(--muted)">${venue}</td>
     </tr>`;
   }).join('');
 }
