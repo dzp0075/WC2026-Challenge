@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>WC 2026 Predictor</title>
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
 :root {
   --pitch:#07180a; --mid:#0c2210; --card:#0f2914; --border:#1d4125;
@@ -345,6 +346,14 @@ body.my-picks-only table.ss [data-me="false"]{display:none}
 
 <script>
 // ══════════════════════════════════════════════════════
+//  SUPABASE
+// ══════════════════════════════════════════════════════
+const sb = window.supabase.createClient(
+  'https://xccnzzuukuiqsejsdjju.supabase.co',
+  'sb_publishable_d1ZWFMyKyR2NNs-p_tQvpQ_1ByGlMtK'
+);
+
+// ══════════════════════════════════════════════════════
 //  CORE DATA
 // ══════════════════════════════════════════════════════
 const PLAYERS = ['Adam','Brandon','Nathan','Henry','James','Nikhil','Dev','Keaton','Will','Steve'];
@@ -518,24 +527,34 @@ function updatePlayerDisplay(){
 }
 
 // ══════════════════════════════════════════════════════
-//  PERSISTENCE
+//  PERSISTENCE (Supabase)
 // ══════════════════════════════════════════════════════
-function savePredictions(){
+async function savePredictions(){
+  if(!currentPlayer) return;
   try{
-    localStorage.setItem('wc2026_preds',JSON.stringify(predictions));
-    localStorage.setItem('wc2026_kopreds',JSON.stringify(koPredictions));
-  }catch(e){}
+    const {error}=await sb.from('predictions').upsert({
+      player: currentPlayer,
+      group_preds: predictions[currentPlayer],
+      ko_preds: koPredictions[currentPlayer]
+    },{onConflict:'player'});
+    if(error) throw error;
+  }catch(e){ console.error('Save failed:',e); }
 }
-function loadPredictions(){
+
+async function loadPredictions(){
   try{
-    const p=JSON.parse(localStorage.getItem('wc2026_preds'));
-    const k=JSON.parse(localStorage.getItem('wc2026_kopreds'));
-    if(p) PLAYERS.forEach(pl=>{
-      if(!p[pl]) return;
-      GK.forEach(g=>{ if(p[pl][g]&&p[pl][g].length===4) predictions[pl][g]=p[pl][g]; });
+    const {data,error}=await sb.from('predictions').select('*');
+    if(error) throw error;
+    (data||[]).forEach(row=>{
+      const pl=row.player;
+      if(!PLAYERS.includes(pl)) return;
+      if(row.group_preds) GK.forEach(g=>{
+        if(row.group_preds[g]&&row.group_preds[g].length===4)
+          predictions[pl][g]=row.group_preds[g];
+      });
+      if(row.ko_preds) Object.assign(koPredictions[pl],row.ko_preds);
     });
-    if(k) PLAYERS.forEach(pl=>{ if(k[pl]) Object.assign(koPredictions[pl],k[pl]); });
-  }catch(e){}
+  }catch(e){ console.error('Load failed:',e); }
 }
 
 // ══════════════════════════════════════════════════════
@@ -1068,12 +1087,15 @@ function renderAll(){
 // ══════════════════════════════════════════════════════
 //  INIT
 // ══════════════════════════════════════════════════════
-loadPredictions();
-if(!currentPlayer||!PLAYERS.includes(currentPlayer)) showLogin();
-else updatePlayerDisplay();
-setMyPicksOnly(window.innerWidth<768);
-renderAll();
-fetchResults();
+(async()=>{
+  setStatus('Loading…');
+  await loadPredictions();
+  if(!currentPlayer||!PLAYERS.includes(currentPlayer)) showLogin();
+  else updatePlayerDisplay();
+  setMyPicksOnly(window.innerWidth<768);
+  renderAll();
+  fetchResults();
+})();
 </script>
 </body>
 </html>
