@@ -238,6 +238,7 @@ body.my-picks-only table.ss [data-me="false"]{display:none}
     <h2>WHO ARE YOU?</h2>
     <p>Select your name to manage your predictions</p>
     <div id="loginGrid"></div>
+    <div id="createProfileArea" style="margin-top:1rem;padding-top:1rem;border-top:1px solid var(--border)"></div>
   </div>
 </div>
 
@@ -497,7 +498,35 @@ function showLogin(){
   grid.innerHTML=PLAYERS.map(p=>
     `<button class="login-btn" onclick="selectPlayer('${p}')">${p}</button>`
   ).join('');
+  document.getElementById('createProfileArea').innerHTML=
+    `<button class="switch-btn" style="width:100%" onclick="showCreateProfile()">+ Create New Profile</button>`;
   document.getElementById('loginOverlay').style.display='flex';
+}
+
+function showCreateProfile(){
+  document.getElementById('createProfileArea').innerHTML=`
+    <input id="newProfileName" type="text" placeholder="Enter your name…"
+      style="background:var(--mid);border:1px solid var(--border);border-radius:8px;
+      color:var(--text);font-size:14px;padding:10px 12px;width:100%;margin-bottom:.5rem;
+      font-family:'DM Sans',sans-serif">
+    <div style="display:flex;gap:.5rem;margin-top:.25rem">
+      <button class="login-btn" style="flex:1;font-size:15px" onclick="submitNewProfile()">Create</button>
+      <button class="switch-btn" onclick="showLogin()">Cancel</button>
+    </div>`;
+  const inp=document.getElementById('newProfileName');
+  inp.focus();
+  inp.addEventListener('keydown',e=>{ if(e.key==='Enter') submitNewProfile(); });
+}
+
+function submitNewProfile(){
+  const name=(document.getElementById('newProfileName').value||'').trim();
+  if(!name) return;
+  if(PLAYERS.includes(name)){ selectPlayer(name); return; }
+  PLAYERS.push(name);
+  predictions[name]={};
+  GK.forEach(g=>{ predictions[name][g]=[...GROUPS[g].teams]; });
+  koPredictions[name]={ r32:{}, r16:{}, qf:{}, sf:{}, final:null };
+  selectPlayer(name);
 }
 
 function selectPlayer(name){
