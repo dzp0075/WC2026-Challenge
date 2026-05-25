@@ -1574,6 +1574,7 @@ function clearInvalidDownstreamPicks(player, changedRound, changedIdx){
 //  BRACKET VISUALIZATION
 // ══════════════════════════════════════════════════════
 function renderBracket(){
+  if(!currentPlayer) return '';
   const UNIT=74, CARD_H=58, CARD_W=155, GAP=20;
   const totalH=16*UNIT, totalW=(CARD_W+GAP)*4+CARD_W;
 
@@ -1705,6 +1706,7 @@ function renderBracket(){
 //  MOBILE KO VIEW
 // ══════════════════════════════════════════════════════
 function renderMobileKO(){
+  if(!currentPlayer) return '';
   const locked=isLocked();
   const roundDefs=[
     {key:'r32',  label:'Round of 32',    order:[1,4,0,2,10,11,8,9,3,5,6,7,13,15,12,14]},
