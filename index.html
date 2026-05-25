@@ -363,7 +363,7 @@ body.my-picks-only table.ss [data-me="false"] { display: none; }
 .bk-locked .bk-team:not(.bk-winner):not(.bk-pick):not(.bk-loser) { opacity:0.5; }
 .bk-locked .bk-pick { opacity:0.75; }
 .bk-lock-notice { font-size:11px; color:#ff7070; letter-spacing:.04em; padding:6px 0 2px; text-align:center; }
-.desktop-bracket { display:block; }
+.desktop-bracket { display:block; overflow:hidden; }
 .mob-ko { display:none; }
 .mob-ko-section { margin-bottom:14px; }
 .mob-ko-rnd-hdr { font-family:'Oswald',sans-serif; font-size:11px; font-weight:700; letter-spacing:.1em; color:#555; text-transform:uppercase; padding:6px 2px 6px; display:flex; align-items:center; gap:8px; }
@@ -1575,57 +1575,53 @@ function clearInvalidDownstreamPicks(player, changedRound, changedIdx){
 // ══════════════════════════════════════════════════════
 function renderBracket(){
   if(!currentPlayer) return '';
-  const UNIT=74, CARD_H=58, CARD_W=155, GAP=20;
-  const totalH=16*UNIT, totalW=(CARD_W+GAP)*4+CARD_W;
+  const UNIT=82, CARD_H=62, CARD_W=158, GAP=16;
+  const CW=CARD_W+GAP;
+  const totalH=8*UNIT, totalW=9*CARD_W+8*GAP;
 
-  // Visual ordering of match indices top-to-bottom for each round
-  // R32: which match index appears at each visual slot 0–15
-  const R32_VIS=[1,4,0,2,10,11,8,9,3,5,6,7,13,15,12,14];
-  // R16: which match index appears at each visual slot 0–7
-  const R16_VIS=[0,1,4,5,2,3,6,7];
+  const L_R32=[1,4,0,2,10,11,8,9];
+  const L_R16=[0,1,4,5];
+  const L_QF=[0,1];
+  const R_R32=[3,5,6,7,13,15,12,14];
+  const R_R16=[2,3,6,7];
+  const R_QF=[2,3];
 
-  // Center-Y for a given round and visual index
   const cy=(round,vi)=>{
-    if(round==='r32')   return (vi+0.5)*UNIT;
-    if(round==='r16')   return (vi*2+1)*UNIT;
-    if(round==='qf')    return (vi*4+2)*UNIT;
-    if(round==='sf')    return (vi*8+4)*UNIT;
-    return 8*UNIT;
+    if(round==='r32') return (vi+0.5)*UNIT;
+    if(round==='r16') return (vi*2+1)*UNIT;
+    if(round==='qf')  return (vi*4+2)*UNIT;
+    return 4*UNIT;
   };
-  // Left-X of each round column
-  const cx=round=>({r32:0,r16:1,qf:2,sf:3,final:4}[round])*(CARD_W+GAP);
+
+  const xL={r32:0,r16:CW,qf:2*CW,sf:3*CW};
+  const xFin=4*CW;
+  const xR={sf:5*CW,qf:6*CW,r16:7*CW,r32:8*CW};
 
   const locked=isLocked();
 
-  const renderCard=(round,matchIdx,visIdx)=>{
+  const renderCard=(round,matchIdx,visIdx,xLeft)=>{
     const teams=getPlayerMatchTeams(currentPlayer,round,matchIdx);
     const pick=round==='final'?koPredictions[currentPlayer].final:(koPredictions[currentPlayer][round]||{})[matchIdx];
     const actual=round==='final'?actualKO.final:(actualKO[round]?.[matchIdx]);
     const top=cy(round,visIdx)-CARD_H/2;
-    const left=cx(round);
-    let h=`<div class="bk-card" style="top:${top}px;left:${left}px;width:${CARD_W}px">`;
+    let h=`<div class="bk-card" style="top:${top}px;left:${xLeft}px;width:${CARD_W}px">`;
     [0,1].forEach(i=>{
       const rawT=teams[i]||'TBD';
       const is3rdSlot=round==='r32'&&i===1&&!!R32_THIRD_GROUPS[matchIdx];
-      // If this is a 3rd-place slot and the player has already picked a candidate,
-      // surface that team as the visible slot team so it can be deselected normally
       const grps3=is3rdSlot?R32_THIRD_GROUPS[matchIdx]:null;
       const cands3=grps3?grps3.map(g=>actualGroups[g]?.[2]??predictions[currentPlayer]?.[g]?.[2]).filter(Boolean):null;
       const pickIs3rd=is3rdSlot&&rawT==='TBD'&&pick&&cands3?.includes(pick);
       const t=pickIs3rd?pick:rawT;
-
       const isPick=!actual&&t!=='TBD'&&pick===t;
-      const isWin =actual&&actual===t;
+      const isWin=actual&&actual===t;
       const isLose=actual&&actual!==t&&t!=='TBD';
       const canClick=!locked&&t!=='TBD'&&!actual;
       const cls=`bk-team${isPick?' bk-pick':''}${isWin?' bk-winner':''}${isLose?' bk-loser':''}`;
       const idxArg=round==='final'?0:matchIdx;
-
       let inner;
       if(t!=='TBD'){
         inner=`${flagCircle(t,13)}<span class="bk-tname">${t}</span>`;
       } else if(is3rdSlot){
-        // No pick yet — show each candidate as an individually clickable flag
         const candFlags=(cands3||[]).map(c=>{
           const canPickC=!locked&&!actual;
           const oc=canPickC?`onclick="toggleKOPick('${esc(currentPlayer)}','r32',${matchIdx},'${esc(c)}')" title="Click to pick / deselect"`:'';
@@ -1646,9 +1642,8 @@ function renderBracket(){
     return h+'</div>';
   };
 
-  // SVG bracket connector lines
   const svgLines=[];
-  const addArm=(x1,x2,ya,yb,ym)=>{
+  const addArmL=(x1,x2,ya,yb,ym)=>{
     const xm=x1+GAP/2;
     svgLines.push(
       `<line x1="${x1}" y1="${ya}" x2="${xm}" y2="${ya}"/>`,
@@ -1657,39 +1652,44 @@ function renderBracket(){
       `<line x1="${xm}" y1="${ym}" x2="${x2}" y2="${ym}"/>`
     );
   };
+  const addArmR=(x1,x2,ya,yb,ym)=>{
+    const xm=x1-GAP/2;
+    svgLines.push(
+      `<line x1="${x1}" y1="${ya}" x2="${xm}" y2="${ya}"/>`,
+      `<line x1="${x1}" y1="${yb}" x2="${xm}" y2="${yb}"/>`,
+      `<line x1="${xm}" y1="${ya}" x2="${xm}" y2="${yb}"/>`,
+      `<line x1="${xm}" y1="${ym}" x2="${x2}" y2="${ym}"/>`
+    );
+  };
 
-  // R32 → R16
-  for(let v=0;v<8;v++){
-    addArm(cx('r32')+CARD_W, cx('r16'), cy('r32',v*2), cy('r32',v*2+1), cy('r16',v));
-  }
-  // R16 → QF
-  for(let v=0;v<4;v++){
-    addArm(cx('r16')+CARD_W, cx('qf'), cy('r16',v*2), cy('r16',v*2+1), cy('qf',v));
-  }
-  // QF → SF
-  for(let v=0;v<2;v++){
-    addArm(cx('qf')+CARD_W, cx('sf'), cy('qf',v*2), cy('qf',v*2+1), cy('sf',v));
-  }
-  // SF → Final
-  addArm(cx('sf')+CARD_W, cx('final'), cy('sf',0), cy('sf',1), cy('final',0));
+  for(let v=0;v<4;v++) addArmL(xL.r32+CARD_W,xL.r16,cy('r32',v*2),cy('r32',v*2+1),cy('r16',v));
+  for(let v=0;v<2;v++) addArmL(xL.r16+CARD_W,xL.qf, cy('r16',v*2),cy('r16',v*2+1),cy('qf',v));
+  addArmL(xL.qf+CARD_W,xL.sf,cy('qf',0),cy('qf',1),cy('sf',0));
+  svgLines.push(`<line x1="${xL.sf+CARD_W}" y1="${cy('sf',0)}" x2="${xFin}" y2="${cy('sf',0)}"/>`);
 
-  // Build all match cards
+  for(let v=0;v<4;v++) addArmR(xR.r32,xR.r16+CARD_W,cy('r32',v*2),cy('r32',v*2+1),cy('r16',v));
+  for(let v=0;v<2;v++) addArmR(xR.r16,xR.qf+CARD_W, cy('r16',v*2),cy('r16',v*2+1),cy('qf',v));
+  addArmR(xR.qf,xR.sf+CARD_W,cy('qf',0),cy('qf',1),cy('sf',0));
+  svgLines.push(`<line x1="${xR.sf}" y1="${cy('sf',0)}" x2="${xFin+CARD_W}" y2="${cy('sf',0)}"/>`);
+
   let cards='';
-  R32_VIS.forEach((mi,vi)=>{ cards+=renderCard('r32',mi,vi); });
-  R16_VIS.forEach((mi,vi)=>{ cards+=renderCard('r16',mi,vi); });
-  [0,1,2,3].forEach(mi=>{ cards+=renderCard('qf',mi,mi); });
-  [0,1].forEach(mi=>{ cards+=renderCard('sf',mi,mi); });
-  cards+=renderCard('final',0,0);
+  L_R32.forEach((mi,vi)=>{ cards+=renderCard('r32',mi,vi,xL.r32); });
+  L_R16.forEach((mi,vi)=>{ cards+=renderCard('r16',mi,vi,xL.r16); });
+  L_QF.forEach((mi,vi) =>{ cards+=renderCard('qf', mi,vi,xL.qf);  });
+  cards+=renderCard('sf',0,0,xL.sf);
+  cards+=renderCard('final',0,0,xFin);
+  cards+=renderCard('sf',1,0,xR.sf);
+  R_QF.forEach((mi,vi) =>{ cards+=renderCard('qf', mi,vi,xR.qf);  });
+  R_R16.forEach((mi,vi)=>{ cards+=renderCard('r16',mi,vi,xR.r16); });
+  R_R32.forEach((mi,vi)=>{ cards+=renderCard('r32',mi,vi,xR.r32); });
 
-  // Round column headers
-  const rndLabels=['Round of 32','Round of 16','Quarters','Semis','Final'];
-  const rndKeys=['r32','r16','qf','sf','final'];
-  const hdrs=rndKeys.map((r,i)=>
-    `<div class="bk-hdr-cell" style="width:${CARD_W}px;margin-right:${i<4?GAP:0}px">${rndLabels[i]}</div>`
+  const hdrLabels=['Round of 32','Round of 16','Quarters','Semis','Final','Semis','Quarters','Round of 16','Round of 32'];
+  const hdrs=hdrLabels.map((label,i)=>
+    `<div class="bk-hdr-cell" style="width:${CARD_W}px;${i<8?`margin-right:${GAP}px`:''}">${label}</div>`
   ).join('');
 
   return `<div class="bk-outer${locked?' bk-locked':''}">
-    ${locked?'<div class="bk-lock-notice">🔒 Predictions locked</div>':''}
+    ${locked?'<div class="bk-lock-notice">\u{1F512} Predictions locked</div>':''}
     <div class="bk-scroll">
       <div class="bk-hdr" style="width:${totalW}px;margin-bottom:10px">${hdrs}</div>
       <div style="position:relative;width:${totalW}px;height:${totalH}px">
@@ -1773,6 +1773,7 @@ function renderMobileKO(){
 function renderKnockout(){
   const el=document.getElementById('koContent');
   let html=`<div class="desktop-bracket">${renderBracket()}</div><div class="mob-ko">${renderMobileKO()}</div>`;
+  setTimeout(fitBracket, 0);
 
   const rounds=[...KO_ROUNDS,'final'];
   rounds.forEach(round=>{
@@ -1908,11 +1909,44 @@ function renderFixtures(){
 // ══════════════════════════════════════════════════════
 //  NAV + RENDER ALL
 // ══════════════════════════════════════════════════════
+function fitBracket(){
+  if(window.innerWidth <= 680) return;
+  const page = document.getElementById('knockout');
+  if(!page || !page.classList.contains('active')) return;
+  const wrap = document.querySelector('.desktop-bracket');
+  const scroll = wrap && wrap.querySelector('.bk-scroll');
+  if(!wrap || !scroll) return;
+  scroll.style.transform = '';
+  scroll.style.transformOrigin = '';
+  scroll.style.marginLeft = '';
+  scroll.style.width = '';
+  wrap.style.height = '';
+  wrap.style.overflow = 'hidden';
+  const availW = wrap.offsetWidth;
+  if(!availW) return;
+  // Measure the bracket's actual inner content width (not scrollWidth, which
+  // equals clientWidth when there's no overflow and gives scale = 1 always)
+  const hdr = scroll.querySelector('.bk-hdr');
+  if(!hdr) return;
+  const naturalW = hdr.offsetWidth + 24; // 24 = bk-scroll left+right padding
+  const scale = Math.min(1, availW / naturalW);
+  scroll.style.width = naturalW + 'px';
+  if(scale < 1){
+    scroll.style.transform = `scale(${scale})`;
+    scroll.style.transformOrigin = 'top left';
+    wrap.style.height = Math.ceil(scroll.offsetHeight * scale) + 'px';
+  } else {
+    scroll.style.marginLeft = Math.floor((availW - naturalW) / 2) + 'px';
+  }
+}
+window.addEventListener('resize', fitBracket);
+
 function showPage(id,btn){
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
   document.getElementById(id).classList.add('active');
   btn.classList.add('active');
+  if(id==='knockout') setTimeout(fitBracket, 0);
 }
 
 function renderAll(){
