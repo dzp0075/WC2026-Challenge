@@ -1056,11 +1056,15 @@ function submitNewProfile(){
   savePredictions();
 }
 
-function selectPlayer(name){
+async function selectPlayer(name){
   currentPlayer=name;
   localStorage.setItem('wc2026_player',name);
   document.getElementById('loginOverlay').style.display='none';
   updatePlayerDisplay();
+  setMyPicksOnly(false);
+  setStatus('Loading…');
+  await loadPredictions();
+  setStatus('');
   renderAll();
 }
 
@@ -1089,13 +1093,23 @@ function updatePlayerDisplay(){
 async function savePredictions(){
   if(!currentPlayer) return;
   try{
-    const {error}=await sb.from('predictions').upsert({
+    const payload={
       player: currentPlayer,
       group_preds: predictions[currentPlayer],
       ko_preds: koPredictions[currentPlayer]
-    },{onConflict:'player'});
+    };
+    const {data, error}=await sb.from('predictions').upsert(payload,{onConflict:'player'}).select();
     if(error) throw error;
-  }catch(e){ console.error('Save failed:',e); }
+    if(!data || data.length===0){
+      // RLS silently blocked the write — no error returned but nothing was saved
+      throw new Error('No rows written — check Supabase RLS policies (allow INSERT + UPDATE for anon role) and that the "player" column has a unique constraint');
+    }
+    setStatus('Saved ✓', '#22c55e');
+    setTimeout(()=>setStatus(''),2000);
+  }catch(e){
+    console.error('Save failed:', e);
+    setStatus('Save failed: '+(e?.message||e?.code||JSON.stringify(e)), '#ef4444');
+  }
 }
 
 async function loadPredictions(){
