@@ -1438,7 +1438,7 @@ function renderGroupTable(){
         const locked=isLocked();
         const select=(isMe&&!locked)
           ?`<select onchange="setPrediction('${esc(p)}','${g}',this.value,'${teamName}')" style="background:#1a1a1a;border:1px solid #333;color:#fff;font-size:11px;padding:2px 4px;border-radius:3px">`
-            +displayOrder.map((t,i)=>`<option value="${i}" ${predPos===i?'selected':''}>${i+1}. ${t}</option>`).join('')
+            +displayOrder.map((t,i)=>`<option value="${i}" ${predPos===i?'selected':''}>${t}</option>`).join('')
             +'</select>'
           :flagCircle(teamName, 16);
         html+=`<td data-me="${p===currentPlayer}" class="${cls}" style="font-size:11px">${select}</td>`
