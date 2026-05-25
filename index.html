@@ -1620,7 +1620,7 @@ function renderBracket(){
       const is3rdSlot=round==='r32'&&i===1&&!!R32_THIRD_GROUPS[matchIdx];
       const grps3=is3rdSlot?R32_THIRD_GROUPS[matchIdx]:null;
       const cands3=grps3?grps3.map(g=>actualGroups[g]?.[2]??predictions[currentPlayer]?.[g]?.[2]).filter(Boolean):null;
-      const pickIs3rd=is3rdSlot&&rawT==='TBD'&&!!pick;
+      const pickIs3rd=is3rdSlot&&rawT==='TBD'&&!!pick&&pick!==teams[0];
       const t=pickIs3rd?pick:rawT;
       const isPick=!actual&&t!=='TBD'&&pick===t;
       const isWin=actual&&actual===t;
@@ -1742,7 +1742,7 @@ function renderMobileKO(){
         const is3rdSlot=round==='r32'&&i===1&&!!R32_THIRD_GROUPS[matchIdx];
         const grps3=is3rdSlot?R32_THIRD_GROUPS[matchIdx]:null;
         const cands3=grps3?grps3.map(g=>actualGroups[g]?.[2]??predictions[currentPlayer]?.[g]?.[2]).filter(Boolean):null;
-        const pickIs3rd=is3rdSlot&&rawT==='TBD'&&!!pick;
+        const pickIs3rd=is3rdSlot&&rawT==='TBD'&&!!pick&&pick!==teams[0];
         const t=pickIs3rd?pick:rawT;
         const isPick=!actual&&t!=='TBD'&&pick===t;
         const isWin=actual&&actual===t;
