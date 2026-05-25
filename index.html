@@ -1444,18 +1444,25 @@ function renderGroupTable(){
         +`<td class="mob-hide">${st.gd>0?'+':''}${st.gd}</td><td class="pts-cell">${st.pts}</td>`;
 
       PLAYERS.forEach(p=>{
-        const pred=predictions[p][g];
-        const predPos=pred.indexOf(teamName);
-        const cls=predCellClass(p,g,predPos);
-        const pts=predPts(p,g,predPos);
         const isMe=p===currentPlayer;
         const locked=isLocked();
-        const select=(isMe&&!locked)
-          ?`<select onchange="setPrediction('${esc(p)}','${g}',this.value,'${teamName}')" style="background:#1a1a1a;border:1px solid #333;color:#fff;font-size:11px;padding:2px 4px;border-radius:3px">`
-            +displayOrder.map((t,i)=>`<option value="${i}" ${predPos===i?'selected':''}>${t}</option>`).join('')
+        const predictedTeam=predictions[p][g][pos];
+        const cls=predCellClass(p,g,pos);
+        const pts=predPts(p,g,pos);
+        let cellContent;
+        if(isMe&&!locked){
+          const posLabel=['1st','2nd','3rd','4th'][pos];
+          cellContent=`<div style="display:inline-flex;align-items:center;gap:3px">`
+            +`<span style="font-size:10px;color:#888;min-width:20px">${posLabel}</span>`
+            +flagCircle(predictedTeam,16)
+            +`<select onchange="setPrediction('${esc(currentPlayer)}','${g}',${pos},this.value)" style="background:#1a1a1a;border:1px solid #333;color:#fff;font-size:11px;padding:2px 4px;border-radius:3px">`
+            +GROUPS[g].teams.map(t=>`<option value="${esc(t)}" ${t===predictedTeam?'selected':''}>${t}</option>`).join('')
             +'</select>'
-          :flagCircle(teamName, 16);
-        html+=`<td data-me="${p===currentPlayer}" class="${cls}" style="font-size:11px">${select}</td>`
+            +'</div>';
+        } else {
+          cellContent=flagCircle(predictedTeam,16);
+        }
+        html+=`<td data-me="${p===currentPlayer}" class="${cls}" style="font-size:11px">${cellContent}</td>`
           +`<td data-me="${p===currentPlayer}" class="${cls}" style="font-weight:700;font-size:11px">${pts||'?'}</td>`;
       });
       html+='</tr>';
