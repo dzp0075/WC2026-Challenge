@@ -1,347 +1,450 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>WC 2026 Predictor</title>
-<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<title>FIFA World Cup 2026 Predictor</title>
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;600;700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/daisyui@3/dist/full.min.css" rel="stylesheet" />
+<script src="https://cdn.tailwindcss.com"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
+/* ── FIFA-dark theme overrides ── */
+[data-theme="dark"] {
+  --p: 217 100% 50%;
+  --pf: 217 100% 40%;
+  --pc: 0 0% 100%;
+  --b1: 0 0% 5%;
+  --b2: 0 0% 8%;
+  --b3: 0 0% 12%;
+  --bc: 0 0% 100%;
+  --n: 215 15% 13%;
+  --nf: 215 15% 9%;
+  --nc: 0 0% 80%;
+  --a: 38 95% 50%;
+  --af: 38 95% 40%;
+  --ac: 0 0% 10%;
+  --rounded-box: 0.5rem;
+  --rounded-btn: 0.25rem;
+  --btn-text-case: uppercase;
+  --border-btn: 1px;
+}
+
 :root {
-  --pitch:#07180a; --mid:#0c2210; --card:#0f2914; --border:#1d4125;
-  --accent:#f5c518; --acc2:#ffd84d; --text:#e6f0e7; --muted:#6b9e73;
-  --r:6px;
-  --win-border:#3d9e52;
-  /* score colours matching the spreadsheet */
-  --c-15: #1a6b2a;   /* 15pts - correct position + advance */
-  --c-10: #2d5c1a;   /* 10pts - correct team advance */
-  --c-5:  #4a4a0a;   /* 5pts  - correct position only */
-  --c-0:  #3d0a0a;   /* 0pts  - wrong */
-  --c-pending: #1a1a2e; /* not yet decided */
+  --blue: #0064ff;
+  --blue-dim: rgba(0,100,255,0.08);
+  --blue-mid: rgba(0,100,255,0.15);
+  --surface: #111111;
+  --surface-2: #171717;
+  --surface-3: #1e1e1e;
+  --line: #242424;
+  --line-soft: rgba(255,255,255,0.05);
+  --text-muted: #606060;
+  --text-dim: #404040;
+  --gold: #f0a500;
+  --silver: #a0a0a8;
+  --bronze: #b07040;
+  /* score colours */
+  --c-15: #0a2a16;
+  --c-10: #0e2a08;
+  --c-5:  #2a1e00;
+  --c-0:  #2a0808;
+  --c-pending: #111;
+  /* JS alias */
+  --mid: #171717;
+  --card: #1e1e1e;
+  --border: #242424;
+  --accent: #0064ff;
+  --muted: #606060;
+  --win-border: #0064ff;
 }
-*{box-sizing:border-box;margin:0;padding:0}
-html,body{font-size:13px}
-body{-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale}
-body{background:var(--pitch);color:var(--text);font-family:'DM Sans',sans-serif;
-  background-image:radial-gradient(ellipse at 50% 0%,rgba(245,197,24,0.03) 0%,transparent 60%)}
-h1,h2,h3{font-family:'Bebas Neue',sans-serif;letter-spacing:0.05em}
 
-/* HEADER */
-header{
-  background:rgba(7,24,10,0.97);border-bottom:2px solid var(--accent);
-  padding:0 1.25rem;height:54px;display:flex;align-items:center;
-  justify-content:space-between;position:sticky;top:0;z-index:300;
+* { box-sizing: border-box; }
+
+/* ── Top accent bar ── */
+.top-bar { height: 3px; background: linear-gradient(90deg, #0064ff 0%, #3d8bff 50%, #0064ff 100%); }
+
+/* ── Page visibility ── */
+.page { display: none; }
+.page.active { display: block; animation: fadeIn .2s ease; }
+@keyframes fadeIn { from { opacity:0; transform:translateY(4px) } to { opacity:1; transform:translateY(0) } }
+
+/* ── Header ── */
+.site-header {
+  background: #0a0a0a;
+  border-bottom: 1px solid var(--line);
+  padding: 0 1.5rem;
+  height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  position: sticky;
+  top: 3px;
+  z-index: 300;
 }
-.logo{display:flex;align-items:center;gap:10px}
-.logo-icon{width:34px;height:34px;border-radius:50%;background:var(--accent);
-  display:flex;align-items:center;justify-content:center;font-size:18px}
-.logo h1{font-size:20px;color:var(--accent);line-height:1}
-.logo small{font-size:10px;color:var(--muted);display:block;font-family:'DM Sans';letter-spacing:0.1em}
-.header-right{display:flex;align-items:center;gap:10px}
-#api-status{font-size:11px;color:var(--muted)}
-
-/* NAV */
-nav{background:var(--mid);border-bottom:1px solid var(--border);display:flex;overflow-x:auto}
-nav button{
-  background:none;border:none;color:var(--muted);font-family:'Bebas Neue';
-  font-size:15px;letter-spacing:0.06em;padding:12px 20px;cursor:pointer;
-  white-space:nowrap;border-bottom:3px solid transparent;transition:all .2s;
+.logo-mark {
+  width: 34px; height: 34px; border-radius: 6px;
+  background: var(--blue);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 18px;
+  box-shadow: 0 0 0 1px rgba(0,100,255,0.3), 0 4px 12px rgba(0,100,255,0.25);
 }
-nav button:hover{color:var(--text)}
-nav button.active{color:var(--accent);border-bottom-color:var(--accent)}
-
-/* PAGES */
-.page{display:none;padding:1rem 1.25rem;max-width:1600px;margin:0 auto}
-.page.active{display:block;animation:fadeIn .2s ease}
-@keyframes fadeIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
-.page-title{font-size:26px;color:var(--accent);margin-bottom:.25rem}
-.page-sub{font-size:11px;color:var(--muted);font-style:italic;margin-bottom:1rem}
-
-/* ===================== SPREADSHEET TABLES ===================== */
-.ss-wrap{overflow-x:auto;border-radius:var(--r);border:1px solid var(--border)}
-table.ss{border-collapse:collapse;width:100%;font-size:12px;min-width:900px}
-table.ss th{
-  background:#081a0b;color:var(--muted);font-weight:600;font-size:11px;
-  letter-spacing:0.06em;text-transform:uppercase;padding:7px 8px;
-  border:1px solid var(--border);white-space:nowrap;text-align:center;
-  position:sticky;top:0;z-index:10;
+.logo-title { font-family: 'Oswald', sans-serif; font-size: 17px; font-weight: 700; letter-spacing: 0.1em; line-height: 1; color: #fff; }
+.logo-title em { color: var(--blue); font-style: normal; }
+.logo-sub { font-size: 9px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--text-dim); margin-top: 2px; }
+.header-right { display: flex; align-items: center; gap: 8px; }
+.hdr-btn {
+  background: transparent; border: 1px solid var(--line); border-radius: 4px;
+  color: var(--text-muted); font-size: 11px; font-weight: 600;
+  padding: 5px 10px; cursor: pointer; transition: all .15s; letter-spacing: 0.04em;
 }
-table.ss th.left{text-align:left}
-table.ss td{
-  border:1px solid rgba(255,255,255,0.06);padding:5px 8px;
-  text-align:center;vertical-align:middle;
+.hdr-btn:hover { border-color: #444; color: #fff; }
+.hdr-btn.on { border-color: var(--blue); color: var(--blue); }
+
+/* ── Nav ── */
+.site-nav {
+  background: #0a0a0a;
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  overflow-x: auto;
+  scrollbar-width: none;
 }
-table.ss td.left{text-align:left}
-table.ss td.team-name{text-align:left;font-weight:500;min-width:120px}
-table.ss td.pts-cell{font-weight:700;color:var(--accent)}
-table.ss tr.group-header td{
-  background:var(--mid);font-family:'Bebas Neue';font-size:13px;
-  letter-spacing:0.06em;color:var(--accent);border-top:2px solid var(--border);
+.site-nav::-webkit-scrollbar { display: none; }
+.nav-btn {
+  background: none; border: none; cursor: pointer;
+  font-family: 'Oswald', sans-serif; font-size: 12px; font-weight: 600;
+  letter-spacing: 0.1em; text-transform: uppercase; white-space: nowrap;
+  padding: 14px 20px; color: var(--text-dim);
+  border-bottom: 2px solid transparent;
+  transition: color .15s, border-color .15s;
+  position: relative;
 }
-table.ss tr:hover td{background:rgba(255,255,255,0.02)}
+.nav-btn:hover { color: #bbb; }
+.nav-btn.active { color: #fff; border-bottom-color: var(--blue); }
 
-/* prediction cell colours */
-.pred-15{background:var(--c-15)!important;color:#7dffaa}
-.pred-10{background:var(--c-10)!important;color:#a8e890}
-.pred-5 {background:var(--c-5)!important; color:#d4d44a}
-.pred-0 {background:var(--c-0)!important; color:#ff8a8a}
-.pred-p {background:var(--c-pending)!important;color:var(--muted)}
-
-/* colour key */
-.color-key{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:.75rem;align-items:center}
-.ck-item{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--muted)}
-.ck-swatch{width:14px;height:14px;border-radius:3px;flex-shrink:0}
-
-/* LEADERBOARD */
-.lb-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:.75rem;margin-bottom:1.25rem}
-.lb-card{
-  background:var(--card);border:1px solid var(--border);border-radius:var(--r);
-  padding:.75rem 1rem;display:flex;flex-direction:column;gap:4px;
-  box-shadow:0 2px 12px rgba(0,0,0,.4);
+/* ── Page sections ── */
+.page-inner { max-width: 1600px; margin: 0 auto; padding: 1.5rem 1.5rem; }
+.section-title {
+  font-family: 'Oswald', sans-serif; font-size: 22px; font-weight: 700;
+  letter-spacing: 0.06em; text-transform: uppercase; color: #fff;
+  display: flex; align-items: center; gap: 10px; margin-bottom: 4px;
 }
-.lb-card.gold{border-color:#f5c518;background:rgba(245,197,24,0.08)}
-.lb-card.silver{border-color:#b0b0b0;background:rgba(176,176,176,0.06)}
-.lb-card.bronze{border-color:#cd7f32;background:rgba(205,127,50,0.06)}
-.lb-rank{font-family:'Bebas Neue';font-size:28px;line-height:1}
-.lb-rank.gold{color:#f5c518}
-.lb-rank.silver{color:#b0b0b0}
-.lb-rank.bronze{color:#cd7f32}
-.lb-rank.other{color:var(--muted)}
-.lb-name{font-size:14px;font-weight:600}
-.lb-pts{font-family:'Bebas Neue';font-size:22px;color:var(--accent)}
-.lb-breakdown{font-size:10px;color:var(--muted);line-height:1.5}
+.section-title::after { content: ''; flex: 0 0 3px; height: 22px; background: var(--blue); border-radius: 1px; order: -1; }
+.section-sub { font-size: 11px; color: var(--text-muted); margin-bottom: 1.25rem; letter-spacing: 0.02em; }
 
-/* INPUT STYLES */
-select{
-  background:var(--mid);border:1px solid var(--border);border-radius:3px;
-  color:var(--text);font-size:11px;padding:3px 5px;cursor:pointer;
+/* ── Score badge key ── */
+.score-key { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 1rem; }
+.score-badge {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 3px 8px; border-radius: 20px; font-size: 10px; font-weight: 600;
+  letter-spacing: 0.04em; border: 1px solid transparent;
 }
-select:focus{outline:none;border-color:var(--accent)}
+.score-badge.s15 { background: var(--c-15); color: #4dffaa; border-color: rgba(77,255,170,0.2); }
+.score-badge.s10 { background: var(--c-10); color: #86e870; border-color: rgba(134,232,112,0.2); }
+.score-badge.s5  { background: var(--c-5);  color: #f5c842; border-color: rgba(245,200,66,0.2); }
+.score-badge.s0  { background: var(--c-0);  color: #ff5f5f; border-color: rgba(255,95,95,0.2); }
+.score-badge.sp  { background: #1a1a1a; color: var(--text-dim); border-color: var(--line); }
 
-/* KNOCKOUT TABLE */
-.ko-section{margin-bottom:1.5rem}
-.ko-round-title{font-family:'Bebas Neue';font-size:18px;color:var(--accent);
-  margin-bottom:.5rem;display:flex;align-items:center;gap:8px}
-.ko-round-title::after{content:'';flex:1;height:1px;background:var(--border)}
-table.ss td.result{font-weight:700;color:var(--acc2)}
-
-/* SCORING RULES */
-.rules-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:.75rem;margin-bottom:1.25rem}
-.rule-card{background:var(--card);border:1px solid var(--border);border-radius:var(--r);padding:.75rem 1rem}
-.rule-card .stage{font-family:'Bebas Neue';font-size:13px;color:var(--muted);letter-spacing:.08em}
-.rule-card .desc{font-size:12px;margin:.25rem 0}
-.rule-card .pts{font-family:'Bebas Neue';font-size:26px;color:var(--accent)}
-
-.toolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:.75rem}
-
-::-webkit-scrollbar{width:5px;height:5px}
-::-webkit-scrollbar-track{background:var(--pitch)}
-::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
-
-/* LOGIN */
-#loginOverlay{position:fixed;inset:0;background:rgba(7,24,10,0.95);display:flex;align-items:center;justify-content:center;z-index:1000;padding:16px}
-#loginBox{
-  background:linear-gradient(180deg,rgba(255,255,255,.04),rgba(0,0,0,.2));
-  border:1px solid var(--border);border-radius:16px;padding:2rem;text-align:center;
-  max-width:500px;width:100%;
-  box-shadow:0 24px 64px rgba(0,0,0,.6);
+/* ── Leaderboard cards ── */
+.lb-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(165px, 1fr)); gap: 10px; margin-bottom: 1.5rem; }
+.lb-card {
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 14px 16px;
+  display: flex; flex-direction: column; gap: 5px;
+  transition: transform .15s, box-shadow .15s, border-color .15s;
+  position: relative; overflow: hidden;
 }
-#loginBox h2{font-size:36px;color:var(--accent);margin-bottom:.4rem}
-#loginBox p{font-size:12px;color:var(--muted);margin-bottom:1.5rem}
-#loginGrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:.5rem}
-.login-btn{
-  background:rgba(0,0,0,.25);border:1px solid var(--border);border-radius:12px;
-  color:var(--text);font-family:'Bebas Neue';font-size:18px;letter-spacing:.05em;
-  padding:.75rem;cursor:pointer;transition:all .15s;min-height:48px;
+.lb-card::before { content:''; position:absolute; top:0; left:0; right:0; height:2px; background: var(--line); }
+.lb-card.rank-1::before { background: var(--gold); }
+.lb-card.rank-2::before { background: var(--silver); }
+.lb-card.rank-3::before { background: var(--bronze); }
+.lb-card:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,.5); border-color: #333; }
+.lb-rank { font-family: 'Oswald', sans-serif; font-size: 11px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-dim); }
+.lb-rank.rank-1 { color: var(--gold); }
+.lb-rank.rank-2 { color: var(--silver); }
+.lb-rank.rank-3 { color: var(--bronze); }
+.lb-name { font-size: 15px; font-weight: 700; color: #fff; letter-spacing: -0.01em; }
+.lb-pts { font-family: 'Oswald', sans-serif; font-size: 28px; font-weight: 700; color: #fff; line-height: 1; }
+.lb-pts-label { font-size: 10px; color: var(--text-muted); font-weight: 600; letter-spacing: 0.06em; margin-left: 1px; }
+.lb-breakdown { font-size: 10px; color: var(--text-dim); line-height: 1.7; border-top: 1px solid var(--line); margin-top: 4px; padding-top: 6px; }
+
+/* ── Tables ── */
+.ss-wrap { overflow-x: auto; border-radius: 8px; border: 1px solid var(--line); }
+table.ss { border-collapse: collapse; width: 100%; font-size: 12px; min-width: 900px; }
+table.ss th {
+  background: #0d0d0d; color: var(--text-muted);
+  font-family: 'Oswald', sans-serif; font-weight: 600; font-size: 10px;
+  letter-spacing: 0.12em; text-transform: uppercase; padding: 10px 10px;
+  border-bottom: 1px solid var(--line); border-right: 1px solid var(--line-soft);
+  white-space: nowrap; text-align: center;
+  position: sticky; top: 0; z-index: 10;
 }
-.login-btn:hover,.login-btn:active{border-color:var(--accent);color:var(--accent);background:rgba(245,197,24,.07)}
-.switch-btn{
-  background:rgba(0,0,0,.2);border:1px solid var(--border);border-radius:10px;
-  color:var(--muted);font-size:11px;padding:7px 12px;cursor:pointer;transition:all .15s;
+table.ss th.left { text-align: left; }
+table.ss tbody tr:nth-child(even) td { background: #0f0f0f; }
+table.ss tbody tr:nth-child(odd) td  { background: #0d0d0d; }
+table.ss td {
+  border-right: 1px solid var(--line-soft); border-bottom: 1px solid var(--line-soft);
+  padding: 6px 10px; text-align: center; vertical-align: middle;
 }
-.switch-btn:hover,.switch-btn:active{border-color:var(--accent);color:var(--accent)}
-.switch-btn.on{color:var(--accent);border-color:var(--accent);background:rgba(245,197,24,.07)}
+table.ss td.left { text-align: left; }
+table.ss td.team-name { text-align: left; font-weight: 600; min-width: 120px; color: #e0e0e0; }
+table.ss td.pts-cell { font-weight: 700; color: #fff; background: var(--blue-dim) !important; }
+table.ss tr.group-header td {
+  background: #111 !important;
+  font-family: 'Oswald', sans-serif; font-size: 11px; font-weight: 700;
+  letter-spacing: 0.14em; color: var(--blue);
+  border-top: 1px solid var(--line); border-bottom: 1px solid var(--line);
+  text-transform: uppercase; padding: 8px 10px;
+}
+table.ss tbody tr:not(.group-header):hover td { background: #141414 !important; }
+table.ss td.result { font-weight: 700; color: var(--blue); }
 
-/* MY PICKS ONLY — hides other players' columns */
-body.my-picks-only table.ss [data-me="false"]{display:none}
+/* ── Knockout section ── */
+.ko-section { margin-bottom: 1.75rem; }
+.ko-round-title {
+  font-family: 'Oswald', sans-serif; font-size: 13px; font-weight: 700;
+  color: #fff; text-transform: uppercase; letter-spacing: 0.14em;
+  margin-bottom: .6rem; display: flex; align-items: center; gap: 10px;
+}
+.ko-round-title::before { content:''; width:3px; height:14px; background: var(--blue); border-radius:1px; flex-shrink:0; }
+.ko-round-title::after  { content:''; flex:1; height:1px; background: var(--line); }
 
-/* ── MOBILE ── */
-@media(max-width:680px){
-  /* layout */
-  .page{padding:.75rem .75rem;padding-bottom:80px}
-  .page-title{font-size:22px}
-  .page-sub{font-size:11px;margin-bottom:.75rem}
+/* ── Select inputs ── */
+select {
+  background: var(--surface-3); border: 1px solid var(--line); border-radius: 4px;
+  color: #ccc; font-size: 11px; padding: 4px 6px; cursor: pointer;
+  transition: border-color .15s; outline: none;
+  font-family: 'DM Sans', sans-serif;
+}
+select:focus { border-color: var(--blue); }
 
-  /* header */
-  header{padding:0 .75rem;height:48px}
-  .logo-icon{width:28px;height:28px;font-size:15px}
-  .logo h1{font-size:16px}
-  .logo small{display:none}
-  #api-status{display:none}
-  #currentPlayerDisplay{font-size:11px;max-width:80px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .switch-btn{padding:6px 10px;font-size:11px;border-radius:8px}
+/* ── Login ── */
+.login-overlay {
+  position: fixed; inset: 0; z-index: 1000;
+  display: flex; align-items: center; justify-content: center; padding: 16px;
+  background: rgba(0,0,0,0.88); backdrop-filter: blur(12px);
+}
+.login-box {
+  background: var(--surface-2);
+  border: 1px solid var(--line); border-top: 2px solid var(--blue);
+  border-radius: 10px; padding: 2rem;
+  width: 100%; max-width: 480px;
+  box-shadow: 0 32px 80px rgba(0,0,0,.8);
+  text-align: center;
+}
+.login-title { font-family: 'Oswald', sans-serif; font-size: 32px; font-weight: 700; letter-spacing: 0.08em; color: #fff; margin-bottom: 6px; }
+.login-title em { color: var(--blue); font-style: normal; }
+.login-sub { font-size: 12px; color: var(--text-muted); margin-bottom: 1.25rem; }
+.login-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 6px; }
+.login-btn {
+  background: var(--surface-3); border: 1px solid var(--line); border-radius: 6px;
+  color: #bbb; font-family: 'Oswald', sans-serif; font-size: 15px; font-weight: 600;
+  letter-spacing: 0.05em; padding: 10px 8px; cursor: pointer;
+  transition: all .15s; min-height: 44px;
+}
+.login-btn:hover { border-color: var(--blue); color: #fff; background: var(--blue-dim); }
+.login-create-btn {
+  width: 100%; background: transparent; border: 1px dashed var(--line); border-radius: 6px;
+  color: var(--text-muted); font-size: 12px; padding: 9px; cursor: pointer;
+  transition: all .15s; margin-top: 8px;
+}
+.login-create-btn:hover { border-color: #444; color: #fff; }
 
-  /* nav — hide scrollbar, keep scroll */
-  nav{scrollbar-width:none}
-  nav::-webkit-scrollbar{display:none}
-  nav{-webkit-overflow-scrolling:touch}
-  nav button{padding:11px 14px;font-size:13px}
+/* ── Prediction cell colours ── */
+.pred-15 { background: var(--c-15) !important; color: #4dffaa; }
+.pred-10 { background: var(--c-10) !important; color: #86e870; }
+.pred-5  { background: var(--c-5)  !important; color: #f5c842; }
+.pred-0  { background: var(--c-0)  !important; color: #ff5f5f; }
+.pred-p  { background: var(--c-pending) !important; color: var(--text-dim); }
 
-  /* leaderboard cards — show breakdown, bigger shadow */
-  .lb-grid{grid-template-columns:repeat(2,1fr);gap:.6rem}
-  .lb-card{
-    border-radius:14px;padding:.875rem;
-    box-shadow:0 6px 24px rgba(0,0,0,.55);
-    background:linear-gradient(160deg,rgba(255,255,255,.05),rgba(0,0,0,.15));
-  }
-  .lb-rank{font-size:26px}
-  .lb-name{font-size:13px}
-  .lb-pts{font-size:20px}
-  .lb-breakdown{display:block;font-size:10px;line-height:1.6;margin-top:2px}
+/* ── My Picks ── */
+body.my-picks-only table.ss [data-me="false"] { display: none; }
 
-  /* leaderboard summary table — hide on mobile, cards are enough */
-  #leaderboard .ss-wrap{display:none}
+/* ── Scrollbar ── */
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #2a2a2a; border-radius: 2px; }
+::-webkit-scrollbar-thumb:hover { background: #444; }
 
-  /* login */
-  #loginBox{padding:1.5rem 1.25rem;border-radius:16px}
-  #loginGrid{grid-template-columns:repeat(2,1fr);gap:.5rem}
-  .login-btn{font-size:18px;padding:.8rem;border-radius:12px}
-
-  /* tables — allow them to shrink when my-picks-only is active */
-  .ss-wrap{-webkit-overflow-scrolling:touch;border-radius:10px}
-  table.ss{font-size:11px;min-width:unset}
-  table.ss td.team-name{min-width:90px}
-  table.ss td,table.ss th{padding:5px 6px}
-
-  /* hide stat & venue columns on mobile to save space */
-  table.ss .mob-hide{display:none}
-
-  /* selects inside table cells stay tight; other selects get bigger */
-  select{padding:8px 7px;border-radius:8px;font-size:13px;min-height:40px}
-  table.ss select{padding:4px 3px;border-radius:5px;font-size:11px;min-height:unset}
-
-  /* ko section spacing */
-  .ko-section{margin-bottom:1rem}
-  .ko-round-title{font-size:16px}
-
-  /* rules */
-  .rules-grid{grid-template-columns:repeat(2,1fr);gap:.5rem}
-  .rule-card{border-radius:12px;box-shadow:0 4px 12px rgba(0,0,0,.4)}
+/* ── Mobile ── */
+@media (max-width: 680px) {
+  .mob-hide { display: none !important; }
+  .page-inner { padding: 1rem .875rem 5rem; }
+  .site-header { padding: 0 .875rem; }
+  .logo-mark { width: 28px; height: 28px; font-size: 15px; }
+  .logo-title { font-size: 14px; }
+  .logo-sub { display: none; }
+  #api-status { display: none; }
+  .nav-btn { padding: 12px 13px; font-size: 11px; }
+  .lb-grid { grid-template-columns: repeat(2, 1fr); gap: 8px; }
+  #leaderboard .ss-wrap { display: none; }
+  table.ss { font-size: 11px; min-width: unset; }
+  table.ss td, table.ss th { padding: 5px 6px; }
+  table.ss td.team-name { min-width: 90px; }
+  select { min-height: 38px; font-size: 13px; }
+  table.ss select { min-height: unset; font-size: 11px; padding: 3px 4px; }
+  .ko-section { margin-bottom: 1.25rem; }
 }
 </style>
 </head>
-<body>
+<body style="background:#0d0d0d;color:#fff;font-family:'DM Sans',sans-serif;margin:0">
 
 <!-- ══ LOGIN OVERLAY ══ -->
-<div id="loginOverlay" style="display:none">
-  <div id="loginBox">
-    <h2>WHO ARE YOU?</h2>
-    <p>Select your name to manage your predictions</p>
-    <div id="loginGrid"></div>
-    <div id="createProfileArea" style="margin-top:1rem;padding-top:1rem;border-top:1px solid var(--border)"></div>
+<div id="loginOverlay" class="login-overlay" style="display:none">
+  <div class="login-box">
+    <div class="login-title">WHO ARE <em>YOU?</em></div>
+    <div class="login-sub">Select your name to manage your predictions</div>
+    <div id="loginGrid" class="login-grid"></div>
+    <div id="createProfileArea"></div>
   </div>
 </div>
 
-<header>
-  <div class="logo">
-    <div class="logo-icon">&#x26BD;</div>
-    <div><h1>WC 2026 PREDICTOR</h1><small>USA &middot; CANADA &middot; MEXICO</small></div>
+<!-- ══ TOP BAR ══ -->
+<div class="top-bar"></div>
+
+<!-- ══ HEADER ══ -->
+<header class="site-header">
+  <div style="display:flex;align-items:center;gap:12px">
+    <div class="logo-mark">⚽</div>
+    <div>
+      <div class="logo-title">WC <em>2026</em> PREDICTOR</div>
+      <div class="logo-sub">USA · Canada · Mexico</div>
+    </div>
   </div>
   <div class="header-right">
-    <span id="api-status" style="font-size:11px;color:var(--muted)"></span>
-    <span id="currentPlayerDisplay" style="font-size:12px;color:var(--accent);font-family:'Bebas Neue';letter-spacing:.05em"></span>
-    <button class="switch-btn" id="myPicksBtn" onclick="toggleMyPicks(this)">My Picks</button>
-    <button class="switch-btn" onclick="showLogin()">Switch</button>
+    <span id="api-status" style="font-size:11px;color:#404040"></span>
+    <span id="currentPlayerDisplay" style="font-size:12px;color:#0064ff;font-family:'Oswald',sans-serif;font-weight:700;letter-spacing:.06em"></span>
+    <button class="hdr-btn" id="myPicksBtn" onclick="toggleMyPicks(this)">My Picks</button>
+    <button class="hdr-btn" onclick="showLogin()">Switch</button>
   </div>
 </header>
 
-<nav>
-  <button class="active" onclick="showPage('leaderboard',this)">&#127942; Leaderboard</button>
-  <button onclick="showPage('groups',this)">&#128202; Group Stage</button>
-  <button onclick="showPage('knockout',this)">&#9889; Knockout</button>
-  <button onclick="showPage('fixtures',this)">&#128197; Fixtures</button>
-  <button onclick="showPage('rules',this)">&#128218; Scoring Rules</button>
+<!-- ══ NAV ══ -->
+<nav class="site-nav">
+  <button class="nav-btn active" onclick="showPage('leaderboard',this)">Leaderboard</button>
+  <button class="nav-btn" onclick="showPage('groups',this)">Group Stage</button>
+  <button class="nav-btn" onclick="showPage('knockout',this)">Knockout</button>
+  <button class="nav-btn" onclick="showPage('fixtures',this)">Fixtures</button>
+  <button class="nav-btn" onclick="showPage('rules',this)">Scoring Rules</button>
 </nav>
 
 <!-- ══ LEADERBOARD ══ -->
 <div id="leaderboard" class="page active">
-  <h2 class="page-title">Leaderboard</h2>
-  <p class="page-sub">Points auto-update as results come in</p>
-  <div id="lbGrid" class="lb-grid"></div>
-  <div class="ss-wrap"><table class="ss" id="lbTable"></table></div>
+  <div class="page-inner">
+    <div class="section-title">Leaderboard</div>
+    <div class="section-sub">Points update automatically as results come in</div>
+    <div id="lbGrid" class="lb-grid"></div>
+    <div class="ss-wrap"><table class="ss" id="lbTable"></table></div>
+  </div>
 </div>
 
 <!-- ══ GROUP STAGE ══ -->
 <div id="groups" class="page">
-  <h2 class="page-title">Group Stage Predictions</h2>
-  <p class="page-sub">Enter each player's predicted finishing order for each group &middot; 5pts correct position &middot; 10pts correct team advances &middot; 15pts both</p>
-  <div class="toolbar">
-    <div class="color-key">
-      <span class="ck-item"><span class="ck-swatch" style="background:var(--c-15)"></span>15 pts</span>
-      <span class="ck-item"><span class="ck-swatch" style="background:var(--c-10)"></span>10 pts</span>
-      <span class="ck-item"><span class="ck-swatch" style="background:var(--c-5)"></span>5 pts</span>
-      <span class="ck-item"><span class="ck-swatch" style="background:var(--c-0)"></span>0 pts</span>
-      <span class="ck-item"><span class="ck-swatch" style="background:var(--c-pending)"></span>Pending</span>
+  <div class="page-inner">
+    <div class="section-title">Group Stage</div>
+    <div class="section-sub">Predicted finishing order &nbsp;·&nbsp; 5 pts correct position &nbsp;·&nbsp; 10 pts correct team advances &nbsp;·&nbsp; 15 pts both</div>
+    <div class="score-key">
+      <span class="score-badge s15">15 pts — Correct position &amp; advances</span>
+      <span class="score-badge s10">10 pts — Correct team advances</span>
+      <span class="score-badge s5">5 pts — Correct position only</span>
+      <span class="score-badge s0">0 pts — Wrong</span>
+      <span class="score-badge sp">Pending</span>
     </div>
+    <div class="ss-wrap"><table class="ss" id="groupTable"></table></div>
   </div>
-  <div class="ss-wrap"><table class="ss" id="groupTable"></table></div>
 </div>
 
 <!-- ══ KNOCKOUT ══ -->
 <div id="knockout" class="page">
-  <h2 class="page-title">Knockout Stage Predictions</h2>
-  <p class="page-sub">R32: 20pts &middot; R16: 30pts &middot; QF: 30pts &middot; SF: 40pts &middot; Final: 50pts per correct pick</p>
-  <div id="koContent"></div>
+  <div class="page-inner">
+    <div class="section-title">Knockout Stage</div>
+    <div class="section-sub">R32: 20 pts &nbsp;·&nbsp; R16: 30 pts &nbsp;·&nbsp; QF: 30 pts &nbsp;·&nbsp; SF: 40 pts &nbsp;·&nbsp; Final: 50 pts per correct winner</div>
+    <div id="koContent"></div>
+  </div>
 </div>
 
 <!-- ══ FIXTURES ══ -->
 <div id="fixtures" class="page">
-  <h2 class="page-title">Full Schedule</h2>
-  <p class="page-sub">All 104 matches &middot; Results update automatically from openfootball</p>
-  <div class="toolbar">
-    <select id="fixtureFilter" onchange="renderFixtures()" style="font-size:12px;padding:5px 8px">
-      <option value="all">All Matches</option>
-      <option value="Group A">Group A</option><option value="Group B">Group B</option>
-      <option value="Group C">Group C</option><option value="Group D">Group D</option>
-      <option value="Group E">Group E</option><option value="Group F">Group F</option>
-      <option value="Group G">Group G</option><option value="Group H">Group H</option>
-      <option value="Group I">Group I</option><option value="Group J">Group J</option>
-      <option value="Group K">Group K</option><option value="Group L">Group L</option>
-      <option value="knockout">Knockout Stage</option>
-    </select>
+  <div class="page-inner">
+    <div class="section-title">Full Schedule</div>
+    <div class="section-sub">All 104 matches &nbsp;·&nbsp; Results update automatically</div>
+    <div style="margin-bottom:1rem">
+      <select id="fixtureFilter" onchange="renderFixtures()">
+        <option value="all">All Matches</option>
+        <option value="Group A">Group A</option><option value="Group B">Group B</option>
+        <option value="Group C">Group C</option><option value="Group D">Group D</option>
+        <option value="Group E">Group E</option><option value="Group F">Group F</option>
+        <option value="Group G">Group G</option><option value="Group H">Group H</option>
+        <option value="Group I">Group I</option><option value="Group J">Group J</option>
+        <option value="Group K">Group K</option><option value="Group L">Group L</option>
+        <option value="knockout">Knockout Stage</option>
+      </select>
+    </div>
+    <div class="ss-wrap"><table class="ss" id="fixturesTable">
+      <thead><tr>
+        <th class="left">Date</th><th class="left mob-hide">Round / Group</th>
+        <th class="left">Home</th><th>Score</th><th class="left">Away</th>
+        <th class="left mob-hide">Venue</th>
+      </tr></thead>
+      <tbody id="fixtureRows"><tr><td colspan="6" style="padding:1.5rem;color:#555;text-align:center">Loading fixtures…</td></tr></tbody>
+    </table></div>
   </div>
-  <div class="ss-wrap"><table class="ss" id="fixturesTable">
-    <thead><tr>
-      <th class="left">Date</th><th class="left mob-hide">Round / Group</th>
-      <th class="left">Home</th><th>Score</th><th class="left">Away</th>
-      <th class="left mob-hide">Venue</th>
-    </tr></thead>
-    <tbody id="fixtureRows"><tr><td colspan="6" style="padding:1rem;color:var(--muted)">Loading fixtures...</td></tr></tbody>
-  </table></div>
 </div>
 
 <!-- ══ RULES ══ -->
 <div id="rules" class="page">
-  <h2 class="page-title">Scoring Rules</h2>
-  <p class="page-sub">Same system as Euro 2024</p>
-  <div class="rules-grid">
-    <div class="rule-card"><div class="stage">Group Stage</div><div class="desc">Correct team advances (1st or 2nd)</div><div class="pts">10 pts</div></div>
-    <div class="rule-card"><div class="stage">Group Stage</div><div class="desc">Correct position in group</div><div class="pts">5 pts</div></div>
-    <div class="rule-card"><div class="stage">Group Stage</div><div class="desc">Correct position AND advances</div><div class="pts">15 pts</div></div>
-    <div class="rule-card"><div class="stage">Round of 32</div><div class="desc">Correct match winner</div><div class="pts">20 pts</div></div>
-    <div class="rule-card"><div class="stage">Quarterfinal</div><div class="desc">Correct match winner</div><div class="pts">30 pts</div></div>
-    <div class="rule-card"><div class="stage">Semifinal</div><div class="desc">Correct match winner</div><div class="pts">40 pts</div></div>
-    <div class="rule-card"><div class="stage">Final</div><div class="desc">World Cup Champion</div><div class="pts">50 pts</div></div>
-  </div>
-  <div style="background:var(--card);border:1px solid var(--border);border-radius:var(--r);padding:1rem;margin-top:.5rem">
-    <h3 style="font-size:16px;color:var(--accent);margin-bottom:.5rem">Tiebreakers</h3>
-    <ol style="padding-left:1.25rem;font-size:12px;line-height:2;color:var(--muted)">
-      <li>Correct World Cup Champion</li>
-      <li>Most Semifinal Teams Correct</li>
-      <li>Most Quarterfinal Teams Correct</li>
-      <li>Most Round of 32 Teams Correct</li>
-      <li>Most Exact Group Stage Predictions</li>
-    </ol>
+  <div class="page-inner">
+    <div class="section-title">Scoring Rules</div>
+    <div class="section-sub">How points are calculated across the tournament</div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:10px;margin-bottom:1.25rem">
+      <div class="lb-card rank-1" style="background:#131313;border:1px solid #242424">
+        <div style="font-family:'Oswald',sans-serif;font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#555;margin-bottom:4px">Group Stage</div>
+        <div style="font-size:11px;color:#aaa;margin-bottom:6px">Correct team advances (1st or 2nd)</div>
+        <div style="font-family:'Oswald',sans-serif;font-size:30px;font-weight:700;color:#fff;line-height:1">10 <span style="font-size:13px;color:#555">pts</span></div>
+      </div>
+      <div class="lb-card" style="background:#131313;border:1px solid #242424">
+        <div style="font-family:'Oswald',sans-serif;font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#555;margin-bottom:4px">Group Stage</div>
+        <div style="font-size:11px;color:#aaa;margin-bottom:6px">Correct position in group</div>
+        <div style="font-family:'Oswald',sans-serif;font-size:30px;font-weight:700;color:#fff;line-height:1">5 <span style="font-size:13px;color:#555">pts</span></div>
+      </div>
+      <div class="lb-card" style="background:#131313;border:1px solid #242424">
+        <div style="font-family:'Oswald',sans-serif;font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#555;margin-bottom:4px">Group Stage</div>
+        <div style="font-size:11px;color:#aaa;margin-bottom:6px">Correct position AND advances</div>
+        <div style="font-family:'Oswald',sans-serif;font-size:30px;font-weight:700;color:#fff;line-height:1">15 <span style="font-size:13px;color:#555">pts</span></div>
+      </div>
+      <div class="lb-card" style="background:#131313;border:1px solid #242424">
+        <div style="font-family:'Oswald',sans-serif;font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#555;margin-bottom:4px">Round of 32</div>
+        <div style="font-size:11px;color:#aaa;margin-bottom:6px">Correct match winner</div>
+        <div style="font-family:'Oswald',sans-serif;font-size:30px;font-weight:700;color:#fff;line-height:1">20 <span style="font-size:13px;color:#555">pts</span></div>
+      </div>
+      <div class="lb-card" style="background:#131313;border:1px solid #242424">
+        <div style="font-family:'Oswald',sans-serif;font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#555;margin-bottom:4px">Quarterfinal</div>
+        <div style="font-size:11px;color:#aaa;margin-bottom:6px">Correct match winner</div>
+        <div style="font-family:'Oswald',sans-serif;font-size:30px;font-weight:700;color:#fff;line-height:1">30 <span style="font-size:13px;color:#555">pts</span></div>
+      </div>
+      <div class="lb-card" style="background:#131313;border:1px solid #242424">
+        <div style="font-family:'Oswald',sans-serif;font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#555;margin-bottom:4px">Semifinal</div>
+        <div style="font-size:11px;color:#aaa;margin-bottom:6px">Correct match winner</div>
+        <div style="font-family:'Oswald',sans-serif;font-size:30px;font-weight:700;color:#fff;line-height:1">40 <span style="font-size:13px;color:#555">pts</span></div>
+      </div>
+      <div class="lb-card rank-1" style="background:#131313;border:1px solid #242424">
+        <div style="font-family:'Oswald',sans-serif;font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#555;margin-bottom:4px">Final</div>
+        <div style="font-size:11px;color:#aaa;margin-bottom:6px">Correct World Cup Champion</div>
+        <div style="font-family:'Oswald',sans-serif;font-size:30px;font-weight:700;color:#fff;line-height:1">50 <span style="font-size:13px;color:#555">pts</span></div>
+      </div>
+    </div>
+    <div style="background:#131313;border:1px solid #242424;border-radius:8px;padding:1.25rem">
+      <div style="font-family:'Oswald',sans-serif;font-size:13px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#0064ff;margin-bottom:.75rem">Tiebreakers</div>
+      <ol style="padding-left:1.25rem;font-size:12px;line-height:2.2;color:#606060;margin:0">
+        <li>Correct World Cup Champion</li>
+        <li>Most Semifinal Teams Correct</li>
+        <li>Most Quarterfinal Teams Correct</li>
+        <li>Most Round of 32 Teams Correct</li>
+        <li>Most Exact Group Stage Predictions</li>
+      </ol>
+    </div>
   </div>
 </div>
 
@@ -398,15 +501,13 @@ function flag(name){
 }
 function dn(name){return name==='TBD'?'TBD':flag(name)+' '+name;}
 
-// ── ACTUAL RESULTS (populated by openfootball fetch) ──
-// actualGroups[g] = sorted array of team names (1st..4th) once group complete
-const actualGroups = {}; // g -> [t1,t2,t3,t4]
-const thirdPlaceAdvancers = new Set(); // top-8 3rd-place teams that advance to R32
-// actualKO[round][idx] = winning team name
+// ── ACTUAL RESULTS ──
+const actualGroups = {};
+const thirdPlaceAdvancers = new Set();
 const actualKO = { r32:{}, r16:{}, qf:{}, sf:{}, final:null };
 
-// ── GROUP STAGE RESULTS (for standings calc) ──
-const groupScores = {}; // g -> [{h,a,sh,sa}]
+// ── GROUP STAGE RESULTS ──
+const groupScores = {};
 GK.forEach(g=>{
   groupScores[g]=[];
   [[0,1],[0,2],[0,3],[1,2],[1,3],[2,3]].forEach(p=>
@@ -415,13 +516,11 @@ GK.forEach(g=>{
 });
 
 // ── PLAYER PREDICTIONS ──
-// predictions[player][g] = [t1,t2,t3,t4]  (team names in predicted order)
-// koPredictions[player][round][idx] = team name
 const predictions = {};
 const koPredictions = {};
 PLAYERS.forEach(p=>{
   predictions[p]={};
-  GK.forEach(g=>{ predictions[p][g]=[...GROUPS[g].teams]; }); // default: alphabetical order
+  GK.forEach(g=>{ predictions[p][g]=[...GROUPS[g].teams]; });
   koPredictions[p]={ r32:{}, r16:{}, qf:{}, sf:{}, final:null };
 });
 
@@ -429,7 +528,6 @@ PLAYERS.forEach(p=>{
 const KO_ROUNDS = ['r32','r16','qf','sf'];
 const KO_LABELS = {r32:'Round of 32',r16:'Round of 16',qf:'Quarterfinals',sf:'Semifinals'};
 const KO_PTS    = {r32:20,r16:30,qf:30,sf:40,final:50};
-// matches per round
 const koMatches = {
   r32: Array.from({length:16},()=>({teams:['TBD','TBD'],result:null})),
   r16: Array.from({length:8}, ()=>({teams:['TBD','TBD'],result:null})),
@@ -443,7 +541,7 @@ const koMatches = {
 // ══════════════════════════════════════════════════════
 function calcGroupPoints(player, g){
   const actual = actualGroups[g];
-  if(!actual) return 0; // group not complete yet
+  if(!actual) return 0;
   const pred = predictions[player][g];
   let pts = 0;
   pred.forEach((team, predPos)=>{
@@ -499,19 +597,18 @@ function showLogin(){
     `<button class="login-btn" onclick="selectPlayer('${p}')">${p}</button>`
   ).join('');
   document.getElementById('createProfileArea').innerHTML=
-    `<button class="switch-btn" style="width:100%" onclick="showCreateProfile()">+ Create New Profile</button>`;
+    `<button class="login-create-btn" onclick="showCreateProfile()">+ Create New Profile</button>`;
   document.getElementById('loginOverlay').style.display='flex';
 }
 
 function showCreateProfile(){
   document.getElementById('createProfileArea').innerHTML=`
     <input id="newProfileName" type="text" placeholder="Enter your name…"
-      style="background:var(--mid);border:1px solid var(--border);border-radius:8px;
-      color:var(--text);font-size:14px;padding:10px 12px;width:100%;margin-bottom:.5rem;
-      font-family:'DM Sans',sans-serif">
-    <div style="display:flex;gap:.5rem;margin-top:.25rem">
-      <button class="login-btn" style="flex:1;font-size:15px" onclick="submitNewProfile()">Create</button>
-      <button class="switch-btn" onclick="showLogin()">Cancel</button>
+      style="width:100%;background:#1e1e1e;border:1px solid #333;border-radius:6px;
+      color:#fff;font-size:14px;padding:10px 12px;margin-bottom:8px;font-family:'DM Sans',sans-serif;outline:none;box-sizing:border-box">
+    <div style="display:flex;gap:8px">
+      <button style="flex:1;background:#0064ff;border:none;border-radius:6px;color:#fff;font-family:'Oswald',sans-serif;font-size:15px;font-weight:700;letter-spacing:.06em;padding:10px;cursor:pointer" onclick="submitNewProfile()">Create</button>
+      <button style="background:transparent;border:1px solid #333;border-radius:6px;color:#666;font-size:12px;padding:10px 14px;cursor:pointer" onclick="showLogin()">Cancel</button>
     </div>`;
   const inp=document.getElementById('newProfileName');
   inp.focus();
@@ -543,6 +640,7 @@ function toggleMyPicks(btn){
   document.body.classList.toggle('my-picks-only',myPicksOnly);
   btn.classList.toggle('on',myPicksOnly);
 }
+
 function setMyPicksOnly(on){
   myPicksOnly=on;
   document.body.classList.toggle('my-picks-only',on);
@@ -590,7 +688,7 @@ async function loadPredictions(){
 //  OPENFOOTBALL FETCH
 // ══════════════════════════════════════════════════════
 const OFB_URL='https://raw.githubusercontent.com/openfootball/worldcup.json/master/2026/worldcup.json';
-let allFixtures=[]; // raw match list from openfootball
+let allFixtures=[];
 const OFB_MAP={
   'Mexico':'Mexico','South Africa':'South Africa','South Korea':'South Korea',
   'Czech Republic':'Czech Republic','Canada':'Canada','Switzerland':'Switzerland',
@@ -610,23 +708,20 @@ const OFB_MAP={
 function ofbMap(n){return OFB_MAP[n]||n;}
 
 const KO_ROUND_MAP={
-  'Round of 32':'r32',
-  'Round of 16':'r16',
-  'Quarter-finals':'qf',
-  'Semi-finals':'sf',
-  'Final':'final'
+  'Round of 32':'r32','Round of 16':'r16',
+  'Quarter-finals':'qf','Semi-finals':'sf','Final':'final'
 };
 
 function koWinner(m, hn, an){
   const s=m.score;
-  if(s.p) return s.p[0]>s.p[1]?hn:an;  // penalty shootout
-  if(s.et) return s.et[0]>s.et[1]?hn:an; // extra time
-  return s.ft[0]>s.ft[1]?hn:an;          // normal time
+  if(s.p) return s.p[0]>s.p[1]?hn:an;
+  if(s.et) return s.et[0]>s.et[1]?hn:an;
+  return s.ft[0]>s.ft[1]?hn:an;
 }
 
 function setStatus(msg,color){
   const el=document.getElementById('api-status');
-  if(el){el.textContent=msg;el.style.color=color||'var(--muted)';}
+  if(el){el.textContent=msg;el.style.color=color||'#555';}
 }
 
 async function fetchResults(){
@@ -636,7 +731,6 @@ async function fetchResults(){
     if(!res.ok) throw new Error('HTTP '+res.status);
     const data=await res.json();
 
-    // reset results
     GK.forEach(g=>groupScores[g].forEach(m=>{m.sh='';m.sa='';}));
     Object.assign(actualKO,{r32:{},r16:{},qf:{},sf:{},final:null});
 
@@ -650,7 +744,6 @@ async function fetchResults(){
       if(typeof hs!=='number'||typeof as_!=='number') return;
 
       if(m.group){
-        // group stage match
         const gLetter=m.group.replace('Group ','');
         const grp=groupScores[gLetter];
         if(!grp) return;
@@ -675,7 +768,6 @@ async function fetchResults(){
       }
     });
 
-    // derive group standings from scores
     GK.forEach(g=>{
       const tms=GROUPS[g].teams;
       const stats=tms.map(n=>({name:n,p:0,w:0,d:0,l:0,gf:0,ga:0,gd:0,pts:0}));
@@ -690,12 +782,10 @@ async function fetchResults(){
         else{stats[m.h].d++;stats[m.h].pts++;stats[m.a].d++;stats[m.a].pts++;}
       });
       const sorted=stats.sort((a,b)=>b.pts-a.pts||b.gd-a.gd||b.gf-a.gf);
-      // mark group complete if all 6 matches played
       const played=groupScores[g].filter(m=>m.sh!=='').length;
       if(played===6) actualGroups[g]=sorted.map(t=>t.name);
     });
 
-    // rank 3rd-place teams — top 8 of 12 advance to R32
     thirdPlaceAdvancers.clear();
     const thirds=GK.filter(g=>actualGroups[g]).map(g=>{
       const name=actualGroups[g][2];
@@ -712,11 +802,10 @@ async function fetchResults(){
     thirds.sort((a,b)=>b.pts-a.pts||b.gd-a.gd||b.gf-a.gf)
       .slice(0,8).forEach(t=>thirdPlaceAdvancers.add(t.name));
 
-    // also update R32 bracket from group qualifiers
     updateKOBracket();
     renderAll();
     renderFixtures();
-    setStatus(matchCount>0?'OK '+matchCount+' results':'OK No results yet','var(--win-border)');
+    setStatus(matchCount>0?'OK '+matchCount+' results':'OK No results yet','#0064ff');
   }catch(e){
     setStatus('Could not load','#e05252');
     renderAll();
@@ -745,31 +834,33 @@ function updateKOBracket(){
 function renderLeaderboard(){
   const ranked=[...PLAYERS].sort((a,b)=>totalPoints(b)-totalPoints(a));
   const grid=document.getElementById('lbGrid');
-  const rankClass=['gold','silver','bronze'];
+
+  const rankClass=['rank-1','rank-2','rank-3'];
+  const medals=['🥇','🥈','🥉'];
+
   grid.innerHTML=ranked.map((p,i)=>{
     const pts=totalPoints(p);
-    const cls=rankClass[i]||'';
-    const rCls=i<3?rankClass[i]:'other';
-    return `<div class="lb-card ${cls}">
-      <div class="lb-rank ${rCls}">${i===9?'Last':ordinal(i+1)}</div>
+    const rc=i<3?rankClass[i]:'';
+    const medal=i<3?medals[i]:'';
+    return `<div class="lb-card ${rc}">
+      <div class="lb-rank ${rc}">${medal} ${ordinal(i+1)} Place</div>
       <div class="lb-name">${p}</div>
-      <div class="lb-pts">${pts} pts</div>
+      <div class="lb-pts">${pts}<span class="lb-pts-label">PTS</span></div>
       <div class="lb-breakdown">
-        Group: ${groupPts(p)} &bull;
-        R32: ${koPts(p,'r32')} &bull;
-        R16: ${koPts(p,'r16')} &bull;
-        QF: ${koPts(p,'qf')} &bull;
-        SF: ${koPts(p,'sf')} &bull;
-        Final: ${koPts(p,'final')}
+        Group <strong>${groupPts(p)}</strong> &nbsp;·&nbsp;
+        R32 <strong>${koPts(p,'r32')}</strong> &nbsp;·&nbsp;
+        R16 <strong>${koPts(p,'r16')}</strong><br>
+        QF <strong>${koPts(p,'qf')}</strong> &nbsp;·&nbsp;
+        SF <strong>${koPts(p,'sf')}</strong> &nbsp;·&nbsp;
+        Final <strong>${koPts(p,'final')}</strong>
       </div>
     </div>`;
   }).join('');
 
-  // summary table
   const tbl=document.getElementById('lbTable');
   const hRow='<tr><th class="left">Player</th><th>Group Stage</th><th>R32</th><th>R16</th><th>QF</th><th>SF</th><th>Final</th><th>TOTAL</th><th>Rank</th></tr>';
   const rows=ranked.map((p,i)=>`<tr>
-    <td class="left" style="font-weight:600">${p}</td>
+    <td class="left" style="font-weight:700;color:#e0e0e0">${p}</td>
     <td>${groupPts(p)}</td>
     <td>${koPts(p,'r32')}</td>
     <td>${koPts(p,'r16')}</td>
@@ -777,7 +868,7 @@ function renderLeaderboard(){
     <td>${koPts(p,'sf')}</td>
     <td>${koPts(p,'final')}</td>
     <td class="pts-cell">${totalPoints(p)}</td>
-    <td style="color:var(--muted)">${ordinal(i+1)}</td>
+    <td style="color:var(--text-muted)">${ordinal(i+1)}</td>
   </tr>`).join('');
   tbl.innerHTML='<thead>'+hRow+'</thead><tbody>'+rows+'</tbody>';
 }
@@ -820,13 +911,12 @@ function renderGroupTable(){
   let html='<thead><tr>'
     +'<th class="left" colspan="2">Group / Team</th>'
     +'<th class="mob-hide">W</th><th class="mob-hide">D</th><th class="mob-hide">L</th><th class="mob-hide">GD</th><th>Pts</th>';
-  PLAYERS.forEach(p=>{const dm=`data-me="${p===currentPlayer}"`;html+=`<th ${dm}>${p}</th><th ${dm} style="font-size:10px;color:var(--muted)">pts</th>`;});
+  PLAYERS.forEach(p=>{const dm=`data-me="${p===currentPlayer}"`;html+=`<th ${dm}>${p}</th><th ${dm} style="font-size:10px;color:#555">pts</th>`;});
   html+='</tr></thead><tbody>';
 
   GK.forEach(g=>{
     const actual=actualGroups[g];
     const tms=GROUPS[g].teams;
-    // compute stats for display
     const stats=tms.map(n=>({name:n,w:0,d:0,l:0,gf:0,ga:0,gd:0,pts:0}));
     groupScores[g].forEach(m=>{
       const h=parseInt(m.sh),a=parseInt(m.sa);
@@ -837,35 +927,32 @@ function renderGroupTable(){
       else if(h<a){stats[m.a].w++;stats[m.a].pts+=3;stats[m.h].l++;}
       else{stats[m.h].d++;stats[m.h].pts++;stats[m.a].d++;stats[m.a].pts++;}
     });
-    // group header row showing total pts per player
-    html+=`<tr class="group-header"><td class="left" colspan="2">Group ${g}${actual?' *Complete':''}</td>`
-      +'<td class="mob-hide" colspan="4" style="font-size:10px;color:var(--muted)">Stats</td>'
-      +'<td style="font-size:10px;color:var(--muted)">Pts</td>';
+    html+=`<tr class="group-header"><td class="left" colspan="2">Group ${g}${actual?' ✓':''}</td>`
+      +'<td class="mob-hide" colspan="4" style="font-size:10px;color:#555">Stats</td>'
+      +'<td style="font-size:10px;color:#555">Pts</td>';
     PLAYERS.forEach(p=>{
       const gp=calcGroupPoints(p,g);
       html+=`<td data-me="${p===currentPlayer}" class="pts-cell" colspan="2">${gp}</td>`;
     });
     html+='</tr>';
 
-    // team rows
     const displayOrder=actual||[...tms];
     displayOrder.forEach((teamName,pos)=>{
       const st=stats.find(s=>s.name===teamName)||{w:0,d:0,l:0,gd:0,pts:0};
-      const rowStyle=actual&&pos<2?'border-left:3px solid var(--win-border)':'';
+      const rowStyle=actual&&pos<2?'border-left:3px solid #0064ff':'';
       html+=`<tr><td style="width:22px;text-align:center;padding:4px;font-size:16px">${flag(teamName)}</td>`
         +`<td class="team-name" style="${rowStyle}">${teamName}</td>`
         +`<td class="mob-hide">${st.w}</td><td class="mob-hide">${st.d}</td><td class="mob-hide">${st.l}</td>`
         +`<td class="mob-hide">${st.gd>0?'+':''}${st.gd}</td><td class="pts-cell">${st.pts}</td>`;
 
       PLAYERS.forEach(p=>{
-        // find where this player predicted this team
         const pred=predictions[p][g];
         const predPos=pred.indexOf(teamName);
         const cls=predCellClass(p,g,predPos);
         const pts=predPts(p,g,predPos);
         const isMe=p===currentPlayer;
         const select=isMe
-          ?`<select onchange="setPrediction('${p}','${g}',this.value,'${teamName}')">`
+          ?`<select onchange="setPrediction('${p}','${g}',this.value,'${teamName}')" style="background:#1a1a1a;border:1px solid #333;color:#fff;font-size:11px;padding:2px 4px;border-radius:3px">`
             +displayOrder.map((t,i)=>`<option value="${i}" ${predPos===i?'selected':''}>${i+1}</option>`).join('')
             +'</select>'
           :`<span style="font-weight:600">${predPos+1}</span>`;
@@ -877,14 +964,12 @@ function renderGroupTable(){
   });
   html+='</tbody>';
 
-  // totals row
-  html+='<tr style="background:var(--mid);border-top:2px solid var(--border)">'
-    +'<td class="left" colspan="2" style="font-family:\'Bebas Neue\';font-size:13px;color:var(--accent)">Total Group Points</td>'
+  html+='<tr style="background:#111;border-top:2px solid #242424">'
+    +'<td class="left" colspan="2" style="font-family:\'Oswald\',sans-serif;font-size:12px;font-weight:700;color:#0064ff;letter-spacing:.1em;text-transform:uppercase">Total Group Points</td>'
     +'<td class="mob-hide" colspan="4"></td>'
     +'<td></td>';
   PLAYERS.forEach(p=>{
-    const gp=groupPts(p);
-    html+=`<td data-me="${p===currentPlayer}" class="pts-cell" colspan="2">${gp}</td>`;
+    html+=`<td data-me="${p===currentPlayer}" class="pts-cell" colspan="2">${groupPts(p)}</td>`;
   });
   html+='</tr>';
 
@@ -897,7 +982,6 @@ function setPrediction(player, g, newPosStr, teamName){
   const pred=predictions[player][g];
   const oldPos=pred.indexOf(teamName);
   if(oldPos===newPos) return;
-  // swap
   const displaced=pred[newPos];
   pred[newPos]=teamName;
   pred[oldPos]=displaced;
@@ -928,7 +1012,6 @@ function getPlayerWinner(player, round, idx){
 
 function getPlayerMatchTeams(player, round, matchIdx){
   if(round==='r32'){
-    // use actual group results if available, else fall back to this player's group predictions
     const q=GK.map(g=>{
       const a=actualGroups[g];
       if(a) return[a[0]||'TBD',a[1]||'TBD',a[2]||'TBD'];
@@ -977,10 +1060,10 @@ function renderKnockout(){
     const label=round==='final'?'Final':KO_LABELS[round];
     const pts=KO_PTS[round];
     const matches=round==='final'?[koMatches.final]:koMatches[round];
-    html+=`<div class="ko-section"><div class="ko-round-title">${label} <span style="font-size:13px;font-family:'DM Sans';color:var(--muted);font-weight:400">${pts} pts each</span></div>`;
+    html+=`<div class="ko-section"><div class="ko-round-title">${label} <span style="font-size:13px;font-family:'DM Sans';color:#555;font-weight:400">${pts} pts each</span></div>`;
     html+='<div class="ss-wrap"><table class="ss">';
     html+='<thead><tr><th class="left" style="min-width:120px">Match</th><th>Result</th>';
-    PLAYERS.forEach(p=>{const dm=`data-me="${p===currentPlayer}"`;html+=`<th ${dm}>${p}</th><th ${dm} style="font-size:10px;color:var(--muted)">pts</th>`;});
+    PLAYERS.forEach(p=>{const dm=`data-me="${p===currentPlayer}"`;html+=`<th ${dm}>${p}</th><th ${dm} style="font-size:10px;color:#555">pts</th>`;});
     html+='</tr></thead><tbody>';
 
     matches.forEach((m,idx)=>{
@@ -999,35 +1082,32 @@ function renderKnockout(){
         const isMe=p===currentPlayer;
         const sel=available.length>0
           ?(isMe
-            ?`<select onchange="setKOPick('${p}','${round}',${idx},this.value)">`
+            ?`<select onchange="setKOPick('${p}','${round}',${idx},this.value)" style="background:#1a1a1a;border:1px solid #333;color:#fff;font-size:11px;padding:2px 4px;border-radius:3px">`
               +`<option value="" ${!ppred?'selected':''}>--</option>`
               +available.map(t=>`<option value="${t}" ${ppred===t?'selected':''}>${t}</option>`).join('')
               +'</select>'
             :`<span style="font-size:11px">${ppred||'—'}</span>`)
-          :(isMe?'<span style="color:var(--muted);font-size:10px">pick prev. round first</span>':'—');
+          :(isMe?'<span style="color:#555;font-size:10px">pick prev. round first</span>':'—');
         html+=`<td data-me="${p===currentPlayer}" class="${cls}" style="font-size:11px">${sel}</td>`
           +`<td data-me="${p===currentPlayer}" class="${cls}" style="font-weight:700;font-size:11px">${ptsTxt}</td>`;
       });
       html+='</tr>';
     });
 
-    // round totals
-    html+='<tr style="background:var(--mid)">'
-      +'<td class="left" colspan="2" style="font-family:\'Bebas Neue\';font-size:12px;color:var(--accent)">Round Points</td>';
+    html+='<tr style="background:#111">'
+      +'<td class="left" colspan="2" style="font-family:\'Oswald\',sans-serif;font-size:11px;font-weight:700;color:#0064ff;letter-spacing:.1em;text-transform:uppercase">Round Points</td>';
     PLAYERS.forEach(p=>{
-      const rpts=koPts(p,round);
-      html+=`<td data-me="${p===currentPlayer}" class="pts-cell" colspan="2">${rpts}</td>`;
+      html+=`<td data-me="${p===currentPlayer}" class="pts-cell" colspan="2">${koPts(p,round)}</td>`;
     });
     html+='</tr>';
 
     html+='</tbody></table></div></div>';
   });
 
-  // Grand total
-  html+='<div class="ss-wrap" style="margin-top:.5rem"><table class="ss"><tbody><tr>'
-    +'<td class="left" colspan="2" style="font-family:\'Bebas Neue\';font-size:14px;color:var(--accent);background:var(--mid)">TOTAL POINTS</td>';
+  html+='<div class="ss-wrap" style="margin-top:.75rem"><table class="ss"><tbody><tr>'
+    +'<td class="left" colspan="2" style="font-family:\'Oswald\',sans-serif;font-size:13px;font-weight:700;color:#0064ff;letter-spacing:.1em;text-transform:uppercase;background:#111">Total Points</td>';
   PLAYERS.forEach(p=>{
-    html+=`<td data-me="${p===currentPlayer}" class="pts-cell" colspan="2" style="background:var(--mid);font-size:14px">${totalPoints(p)}</td>`;
+    html+=`<td data-me="${p===currentPlayer}" class="pts-cell" colspan="2" style="background:#111;font-size:14px;font-family:'Oswald',sans-serif;font-weight:700">${totalPoints(p)}</td>`;
   });
   html+='</tr></tbody></table></div>';
 
@@ -1070,7 +1150,7 @@ function renderFixtures(){
   else if(filter!=='all')  matches=matches.filter(m=>m.group===filter);
 
   if(!matches.length){
-    tbody.innerHTML='<tr><td colspan="6" style="padding:1rem;color:var(--muted)">No fixtures loaded yet — check back after June 11</td></tr>';
+    tbody.innerHTML='<tr><td colspan="6" style="padding:1.5rem;color:#555;text-align:center">No fixtures loaded yet — check back after June 11</td></tr>';
     return;
   }
 
@@ -1082,17 +1162,17 @@ function renderFixtures(){
 
   tbody.innerHTML=matches.map(m=>{
     const hasScore=m.score&&m.score.ft&&typeof m.score.ft[0]==='number';
-    const score=hasScore?`<strong>${m.score.ft[0]}–${m.score.ft[1]}</strong>`:'<span style="color:var(--muted)">vs</span>';
+    const score=hasScore?`<strong>${m.score.ft[0]}–${m.score.ft[1]}</strong>`:'<span style="color:#555">vs</span>';
     const roundLabel=m.group||m.round||'—';
     const venue=m.ground||'—';
     const rowStyle=hasScore?'':'opacity:0.75';
     return `<tr style="${rowStyle}">
-      <td class="left" style="white-space:nowrap;color:var(--muted)">${fmt(m.date)}</td>
-      <td class="left mob-hide" style="font-size:11px;color:var(--muted)">${roundLabel}</td>
+      <td class="left" style="white-space:nowrap;color:#555">${fmt(m.date)}</td>
+      <td class="left mob-hide" style="font-size:11px;color:#555">${roundLabel}</td>
       <td class="left"><span style="margin-right:4px">${flag(ofbMap(m.team1))}</span>${ofbMap(m.team1)}</td>
       <td style="font-size:13px;min-width:50px">${score}</td>
       <td class="left"><span style="margin-right:4px">${flag(ofbMap(m.team2))}</span>${ofbMap(m.team2)}</td>
-      <td class="left mob-hide" style="font-size:11px;color:var(--muted)">${venue}</td>
+      <td class="left mob-hide" style="font-size:11px;color:#555">${venue}</td>
     </tr>`;
   }).join('');
 }
@@ -1102,7 +1182,7 @@ function renderFixtures(){
 // ══════════════════════════════════════════════════════
 function showPage(id,btn){
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
-  document.querySelectorAll('nav button').forEach(b=>b.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
   document.getElementById(id).classList.add('active');
   btn.classList.add('active');
 }
