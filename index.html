@@ -299,8 +299,8 @@ select:focus { border-color: var(--blue); }
   border-bottom: 1px solid #1a1a1a;
 }
 .mg-row:last-child { border-bottom: none; }
-.mg-pos { font-family:'Oswald',sans-serif; font-size:15px; font-weight:700; color:#303030; width:18px; text-align:center; flex-shrink:0; }
-.mg-pos.adv { color: var(--blue); }
+.mg-pos { width:28px; text-align:center; flex-shrink:0; display:flex; align-items:center; justify-content:center; }
+.mg-pos.adv span { box-shadow: 0 0 0 2px var(--blue); }
 .mg-name { flex:1; font-size:12px; font-weight:600; color:#ccc; }
 .mg-pts-badge { font-family:'Oswald',sans-serif; font-size:13px; font-weight:700; padding:2px 7px; border-radius:4px; }
 
@@ -532,6 +532,14 @@ function pColor(name){
 function pDot(name, size=8){
   return `<span class="p-dot" style="width:${size}px;height:${size}px;background:${pColor(name)}"></span>`;
 }
+function esc(s){ return String(s).replace(/\\/g,'\\\\').replace(/'/g,"\\'"); }
+function flagCircle(name, size=18){
+  let code;
+  if(name==='Scotland') code='gb-sct';
+  else if(name==='England') code='gb-eng';
+  else { const c=FLAGS[name]; if(!c) return ''; code=c.toLowerCase(); }
+  return `<span style="display:inline-block;width:${size}px;height:${size}px;border-radius:50%;overflow:hidden;vertical-align:middle;flex-shrink:0;border:1px solid rgba(255,255,255,0.08)"><img src="https://flagcdn.com/w40/${code}.png" alt="${name}" style="width:100%;height:100%;object-fit:cover"></span>`;
+}
 
 // ══════════════════════════════════════════════════════
 //  PREDICTION LOCK
@@ -583,7 +591,7 @@ function renderMobileGroups(){
       const predPos = pred ? pred.indexOf(teamName) : pos;
       const cls = actual ? predCellClass(currentPlayer, g, predPos) : '';
       const pts = actual ? predPts(currentPlayer, g, predPos) : '';
-      const adv = actual && pos < 2;
+      const adv = actual && (pos < 2 || (pos === 2 && thirdPlaceAdvancers.has(teamName)));
       let ptsBadgeStyle = '';
       let ptsColor = '';
       if(cls==='pred-15'){ ptsBadgeStyle='background:var(--c-15)'; ptsColor='color:#4dffaa'; }
@@ -591,8 +599,7 @@ function renderMobileGroups(){
       else if(cls==='pred-5'){ ptsBadgeStyle='background:var(--c-5)'; ptsColor='color:#f5c842'; }
       else if(cls==='pred-0'){ ptsBadgeStyle='background:var(--c-0)'; ptsColor='color:#ff5f5f'; }
       html += `<div class="mg-row">
-        <div class="mg-pos ${adv?'adv':''}">${pos+1}</div>
-        <div style="font-size:15px;line-height:1">${flag(teamName)}</div>
+        <div class="mg-pos ${adv?'adv':''}">${flagCircle(teamName, 24)}</div>
         <div class="mg-name">${teamName}</div>
         ${actual
           ? `<div class="mg-pts-badge" style="${ptsBadgeStyle};${ptsColor}">${pts} pts</div>`
@@ -902,7 +909,7 @@ let currentPlayer = localStorage.getItem('wc2026_player') || null;
 function showLogin(){
   const grid=document.getElementById('loginGrid');
   grid.innerHTML=PLAYERS.map(p=>
-    `<button class="login-btn" onclick="selectPlayer('${p}')">${p}</button>`
+    `<button class="login-btn" onclick="selectPlayer('${esc(p)}')">${p}</button>`
   ).join('');
   document.getElementById('createProfileArea').innerHTML=
     `<button class="login-create-btn" onclick="showCreateProfile()">+ Create New Profile</button>`;
@@ -1257,7 +1264,7 @@ function renderGroupTable(){
     const displayOrder=actual||[...tms];
     displayOrder.forEach((teamName,pos)=>{
       const st=stats.find(s=>s.name===teamName)||{w:0,d:0,l:0,gd:0,pts:0};
-      const rowStyle=actual&&pos<2?'border-left:3px solid #0064ff':'';
+      const rowStyle=actual&&(pos<2||(pos===2&&thirdPlaceAdvancers.has(teamName)))?'border-left:3px solid #0064ff':'';
       html+=`<tr><td style="width:22px;text-align:center;padding:4px;font-size:16px">${flag(teamName)}</td>`
         +`<td class="team-name" style="${rowStyle}">${teamName}</td>`
         +`<td class="mob-hide">${st.w}</td><td class="mob-hide">${st.d}</td><td class="mob-hide">${st.l}</td>`
@@ -1271,10 +1278,10 @@ function renderGroupTable(){
         const isMe=p===currentPlayer;
         const locked=isLocked();
         const select=(isMe&&!locked)
-          ?`<select onchange="setPrediction('${p}','${g}',this.value,'${teamName}')" style="background:#1a1a1a;border:1px solid #333;color:#fff;font-size:11px;padding:2px 4px;border-radius:3px">`
-            +displayOrder.map((t,i)=>`<option value="${i}" ${predPos===i?'selected':''}>${i+1}</option>`).join('')
+          ?`<select onchange="setPrediction('${esc(p)}','${g}',this.value,'${teamName}')" style="background:#1a1a1a;border:1px solid #333;color:#fff;font-size:11px;padding:2px 4px;border-radius:3px">`
+            +displayOrder.map((t,i)=>`<option value="${i}" ${predPos===i?'selected':''}>${i+1}. ${t}</option>`).join('')
             +'</select>'
-          :`<span style="font-weight:600">${predPos+1}</span>`;
+          :flagCircle(teamName, 16);
         html+=`<td data-me="${p===currentPlayer}" class="${cls}" style="font-size:11px">${select}</td>`
           +`<td data-me="${p===currentPlayer}" class="${cls}" style="font-weight:700;font-size:11px">${pts||'?'}</td>`;
       });
@@ -1389,9 +1396,10 @@ function renderKnockout(){
     matches.forEach((m,idx)=>{
       const actual=round==='final'?actualKO.final:actualKO[round][idx];
       const labelTeams=getActualMatchTeams(round,idx);
-      const matchLabel=labelTeams[0]==='TBD'?`Match ${idx+1}`:`${dn(labelTeams[0])} vs ${dn(labelTeams[1])}`;
+      const matchLabel=labelTeams[0]==='TBD'?`Match ${idx+1}`
+        :`<span style="display:inline-flex;align-items:center;gap:4px">${flagCircle(labelTeams[0],14)} ${labelTeams[0]} <span style="color:#444">vs</span> ${flagCircle(labelTeams[1],14)} ${labelTeams[1]}</span>`;
       html+=`<tr><td class="left" style="font-size:11px">${matchLabel}</td>`;
-      html+=`<td class="result">${actual?dn(actual):'—'}</td>`;
+      html+=`<td class="result">${actual?`<span style="display:inline-flex;align-items:center;gap:5px">${flagCircle(actual,16)} ${actual}</span>`:'—'}</td>`;
       PLAYERS.forEach(p=>{
         const ppred=round==='final'?koPredictions[p].final:(koPredictions[p][round]||{})[idx];
         const correct=actual&&ppred===actual;
@@ -1403,11 +1411,11 @@ function renderKnockout(){
         const locked=isLocked();
         const sel=available.length>0
           ?((isMe&&!locked)
-            ?`<select onchange="setKOPick('${p}','${round}',${idx},this.value)" style="background:#1a1a1a;border:1px solid #333;color:#fff;font-size:11px;padding:2px 4px;border-radius:3px">`
+            ?`<select onchange="setKOPick('${esc(p)}','${round}',${idx},this.value)" style="background:#1a1a1a;border:1px solid #333;color:#fff;font-size:11px;padding:2px 4px;border-radius:3px">`
               +`<option value="" ${!ppred?'selected':''}>--</option>`
               +available.map(t=>`<option value="${t}" ${ppred===t?'selected':''}>${t}</option>`).join('')
               +'</select>'
-            :`<span style="font-size:11px">${ppred||'—'}</span>`)
+            :(ppred?flagCircle(ppred,16):'—'))
           :((isMe&&!locked)?'<span style="color:#555;font-size:10px">pick prev. round first</span>':'—');
         html+=`<td data-me="${p===currentPlayer}" class="${cls}" style="font-size:11px">${sel}</td>`
           +`<td data-me="${p===currentPlayer}" class="${cls}" style="font-weight:700;font-size:11px">${ptsTxt}</td>`;
