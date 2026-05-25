@@ -8,6 +8,7 @@
 <link href="https://cdn.jsdelivr.net/npm/daisyui@3/dist/full.min.css" rel="stylesheet" />
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
 <style>
 /* ── FIFA-dark theme overrides ── */
 [data-theme="dark"] {
@@ -252,6 +253,57 @@ select:focus { border-color: var(--blue); }
 }
 .login-create-btn:hover { border-color: #444; color: #fff; }
 
+/* ── Lock banner ── */
+.lock-banner {
+  padding: 7px 1.5rem; font-size: 11px; font-family: 'Oswald', sans-serif;
+  letter-spacing: 0.06em; text-align: center; border-bottom: 1px solid;
+}
+.lock-banner.countdown { background: rgba(0,100,255,0.06); color: #4d88ff; border-color: rgba(0,100,255,0.15); }
+.lock-banner.locked    { background: rgba(255,95,95,0.06);  color: #ff7070; border-color: rgba(255,95,95,0.15); }
+
+/* ── Player color dot ── */
+.p-dot { display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:4px; vertical-align:middle; flex-shrink:0; }
+
+/* ── Chart container ── */
+.chart-wrap {
+  background: #111; border: 1px solid #242424; border-radius: 8px;
+  padding: 1.25rem; margin-top: 1.25rem;
+}
+.chart-wrap-title {
+  font-family: 'Oswald', sans-serif; font-size: 13px; font-weight: 700;
+  letter-spacing: 0.1em; text-transform: uppercase; color: #fff; margin-bottom: 1rem;
+  display: flex; align-items: center; gap: 8px;
+}
+.chart-wrap-title::before { content:''; width:3px; height:13px; background:var(--blue); border-radius:1px; }
+
+/* ── Mobile group cards ── */
+.mobile-groups { display: none; }
+.desktop-table-wrap { display: block; }
+@media (max-width: 680px) {
+  .mobile-groups { display: block; }
+  .desktop-table-wrap { display: none; }
+}
+.mg-card {
+  background: #111; border: 1px solid #242424; border-radius: 8px;
+  margin-bottom: 8px; overflow: hidden;
+}
+.mg-header {
+  background: #0d0d0d; padding: 8px 12px;
+  font-family: 'Oswald', sans-serif; font-size: 11px; font-weight: 700;
+  letter-spacing: 0.12em; text-transform: uppercase; color: var(--blue);
+  display: flex; justify-content: space-between; align-items: center;
+  border-bottom: 1px solid #1e1e1e;
+}
+.mg-row {
+  display: flex; align-items: center; padding: 8px 12px; gap: 8px;
+  border-bottom: 1px solid #1a1a1a;
+}
+.mg-row:last-child { border-bottom: none; }
+.mg-pos { font-family:'Oswald',sans-serif; font-size:15px; font-weight:700; color:#303030; width:18px; text-align:center; flex-shrink:0; }
+.mg-pos.adv { color: var(--blue); }
+.mg-name { flex:1; font-size:12px; font-weight:600; color:#ccc; }
+.mg-pts-badge { font-family:'Oswald',sans-serif; font-size:13px; font-weight:700; padding:2px 7px; border-radius:4px; }
+
 /* ── Prediction cell colours ── */
 .pred-15 { background: var(--c-15) !important; color: #4dffaa; }
 .pred-10 { background: var(--c-10) !important; color: #86e870; }
@@ -303,6 +355,8 @@ body.my-picks-only table.ss [data-me="false"] { display: none; }
 
 <!-- ══ TOP BAR ══ -->
 <div class="top-bar"></div>
+<!-- ══ LOCK BANNER ══ -->
+<div id="lockBanner" class="lock-banner countdown" style="display:none"></div>
 
 <!-- ══ HEADER ══ -->
 <header class="site-header">
@@ -337,6 +391,10 @@ body.my-picks-only table.ss [data-me="false"] { display: none; }
     <div class="section-sub">Points update automatically as results come in</div>
     <div id="lbGrid" class="lb-grid"></div>
     <div class="ss-wrap"><table class="ss" id="lbTable"></table></div>
+    <div class="chart-wrap" id="chartContainer" style="display:none">
+      <div class="chart-wrap-title">Points Over Time</div>
+      <div style="position:relative;height:280px"><canvas id="pointsChart"></canvas></div>
+    </div>
   </div>
 </div>
 
@@ -352,7 +410,8 @@ body.my-picks-only table.ss [data-me="false"] { display: none; }
       <span class="score-badge s0">0 pts — Wrong</span>
       <span class="score-badge sp">Pending</span>
     </div>
-    <div class="ss-wrap"><table class="ss" id="groupTable"></table></div>
+    <div class="mobile-groups" id="mobileGroupCards"></div>
+    <div class="desktop-table-wrap"><div class="ss-wrap"><table class="ss" id="groupTable"></table></div></div>
   </div>
 </div>
 
@@ -449,6 +508,250 @@ body.my-picks-only table.ss [data-me="false"] { display: none; }
 </div>
 
 <script>
+// ══════════════════════════════════════════════════════
+//  PLAYER COLORS
+// ══════════════════════════════════════════════════════
+const PLAYER_COLORS = {
+  'Adam':    '#FF6B6B',
+  'Brandon': '#4ECDC4',
+  'Nathan':  '#45B7D1',
+  'Henry':   '#96E072',
+  'James':   '#FFE66D',
+  'Nikhil':  '#FF9FF3',
+  'Dev':     '#54A0FF',
+  'Keaton':  '#A29BFE',
+  'Will':    '#FD9644',
+  'Steve':   '#26de81',
+};
+function pColor(name){ return PLAYER_COLORS[name]||'#888'; }
+function pDot(name, size=8){
+  return `<span class="p-dot" style="width:${size}px;height:${size}px;background:${pColor(name)}"></span>`;
+}
+
+// ══════════════════════════════════════════════════════
+//  PREDICTION LOCK
+// ══════════════════════════════════════════════════════
+const LOCK_DATE = new Date('2026-06-11T15:00:00Z');
+function isLocked(){ return new Date() >= LOCK_DATE; }
+
+function updateLockBanner(){
+  const el = document.getElementById('lockBanner');
+  if(!el) return;
+  if(isLocked()){
+    el.textContent = '🔒  Predictions are locked — Tournament is underway';
+    el.className = 'lock-banner locked';
+    el.style.display = 'block';
+    return;
+  }
+  const diff = LOCK_DATE - new Date();
+  const days = Math.ceil(diff / 864e5);
+  if(days <= 21){
+    el.textContent = `⏳  Predictions lock in ${days} day${days!==1?'s':''} — June 11, 2026`;
+    el.className = 'lock-banner countdown';
+    el.style.display = 'block';
+  } else {
+    el.style.display = 'none';
+  }
+}
+
+// ══════════════════════════════════════════════════════
+//  MOBILE GROUP CARDS
+// ══════════════════════════════════════════════════════
+function renderMobileGroups(){
+  const el = document.getElementById('mobileGroupCards');
+  if(!el) return;
+  let html = '';
+  GK.forEach(g=>{
+    const actual = actualGroups[g];
+    const pred = currentPlayer ? predictions[currentPlayer][g] : null;
+    const displayOrder = actual || pred || [...GROUPS[g].teams];
+    const gpts = (currentPlayer && actual) ? calcGroupPoints(currentPlayer, g) : null;
+    html += `<div class="mg-card">
+      <div class="mg-header">
+        <span>Group ${g}</span>
+        <span style="display:flex;align-items:center;gap:8px">
+          ${actual ? `<span style="font-size:10px;color:#404040;letter-spacing:.06em">FINAL</span>` : ''}
+          ${gpts!==null ? `<span style="color:#fff;font-size:14px">${gpts} pts</span>` : ''}
+        </span>
+      </div>`;
+    displayOrder.forEach((teamName, pos)=>{
+      const predPos = pred ? pred.indexOf(teamName) : pos;
+      const cls = actual ? predCellClass(currentPlayer, g, predPos) : '';
+      const pts = actual ? predPts(currentPlayer, g, predPos) : '';
+      const adv = actual && pos < 2;
+      let ptsBadgeStyle = '';
+      let ptsColor = '';
+      if(cls==='pred-15'){ ptsBadgeStyle='background:var(--c-15)'; ptsColor='color:#4dffaa'; }
+      else if(cls==='pred-10'){ ptsBadgeStyle='background:var(--c-10)'; ptsColor='color:#86e870'; }
+      else if(cls==='pred-5'){ ptsBadgeStyle='background:var(--c-5)'; ptsColor='color:#f5c842'; }
+      else if(cls==='pred-0'){ ptsBadgeStyle='background:var(--c-0)'; ptsColor='color:#ff5f5f'; }
+      html += `<div class="mg-row">
+        <div class="mg-pos ${adv?'adv':''}">${pos+1}</div>
+        <div style="font-size:15px;line-height:1">${flag(teamName)}</div>
+        <div class="mg-name">${teamName}</div>
+        ${actual
+          ? `<div class="mg-pts-badge" style="${ptsBadgeStyle};${ptsColor}">${pts} pts</div>`
+          : (pred ? `<div style="font-size:10px;color:#404040">Pred: ${predPos+1}</div>` : '')
+        }
+      </div>`;
+    });
+    html += '</div>';
+  });
+  el.innerHTML = html;
+}
+
+// ══════════════════════════════════════════════════════
+//  POINTS HISTORY CHART
+// ══════════════════════════════════════════════════════
+let _chart = null;
+
+function buildPointsHistory(){
+  const played = allFixtures.filter(m=>m.score?.ft&&typeof m.score.ft[0]==='number')
+    .sort((a,b)=>new Date(a.date)-new Date(b.date));
+  if(!played.length) return null;
+
+  // Group by date
+  const byDate = {};
+  played.forEach(m=>{ (byDate[m.date]=byDate[m.date]||[]).push(m); });
+  const dates = Object.keys(byDate).sort();
+
+  // Cumulative state
+  const cumG = {};
+  GK.forEach(g=>{
+    cumG[g]=[];
+    [[0,1],[0,2],[0,3],[1,2],[1,3],[2,3]].forEach(p=>cumG[g].push({h:p[0],a:p[1],sh:'',sa:''}));
+  });
+  const cumKO = {r32:{},r16:{},qf:{},sf:{},final:null};
+  const koIdx = {r32:0,r16:0,qf:0,sf:0};
+
+  const labels = [];
+  const series = {};
+  PLAYERS.forEach(p=>series[p]=[]);
+
+  dates.forEach(date=>{
+    byDate[date].forEach(m=>{
+      const hn=ofbMap(m.team1), an=ofbMap(m.team2);
+      const hs=m.score.ft[0], as_=m.score.ft[1];
+      if(m.group){
+        const gl=m.group.replace('Group ','');
+        const grp=cumG[gl]; const tms=GROUPS[gl]?.teams;
+        if(!grp||!tms) return;
+        const hi=tms.indexOf(hn), ai=tms.indexOf(an);
+        if(hi===-1||ai===-1) return;
+        const mi=grp.findIndex(x=>x.h===hi&&x.a===ai);
+        if(mi!==-1){grp[mi].sh=hs;grp[mi].sa=as_;}
+      } else if(m.round){
+        const round=KO_ROUND_MAP[m.round]; if(!round) return;
+        const w=koWinner(m,hn,an);
+        if(round==='final') cumKO.final=w;
+        else cumKO[round][koIdx[round]++]=w;
+      }
+    });
+
+    // Derive group standings snapshot
+    const snapG = {};
+    GK.forEach(g=>{
+      const tms=GROUPS[g].teams;
+      const st=tms.map(n=>({name:n,pts:0,gd:0,gf:0}));
+      cumG[g].forEach(m=>{
+        const h=parseInt(m.sh),a=parseInt(m.sa);
+        if(isNaN(h)||isNaN(a)) return;
+        st[m.h].gf+=h;st[m.h].gd+=h-a;st[m.a].gf+=a;st[m.a].gd+=a-h;
+        if(h>a)st[m.h].pts+=3; else if(h<a)st[m.a].pts+=3; else{st[m.h].pts++;st[m.a].pts++;}
+      });
+      if(cumG[g].filter(m=>m.sh!=='').length===6)
+        snapG[g]=st.sort((a,b)=>b.pts-a.pts||b.gd-a.gd||b.gf-a.gf).map(t=>t.name);
+    });
+
+    labels.push(new Date(date).toLocaleDateString('en-GB',{day:'numeric',month:'short'}));
+
+    PLAYERS.forEach(p=>{
+      let pts=0;
+      GK.forEach(g=>{
+        const actual=snapG[g]; if(!actual) return;
+        predictions[p][g].forEach((team,predPos)=>{
+          const actPos=actual.indexOf(team); if(actPos===-1) return;
+          const pA=predPos<2,aA=actPos<2,pc=predPos===actPos;
+          if(pc&&aA)pts+=15; else if(pc)pts+=5; else if(pA&&aA)pts+=10;
+        });
+      });
+      ['r32','r16','qf','sf'].forEach(round=>{
+        Object.keys(cumKO[round]).forEach(i=>{
+          const act=cumKO[round][i]; if(!act) return;
+          if((koPredictions[p][round]||{})[i]===act) pts+=KO_PTS[round];
+        });
+      });
+      if(cumKO.final&&koPredictions[p].final===cumKO.final) pts+=KO_PTS.final;
+      series[p].push(pts);
+    });
+  });
+
+  return {labels, series};
+}
+
+function buildDemoHistory(){
+  // Single starting point on Jun 10 — everyone at 0 before the tournament begins
+  const labels=['10 Jun'];
+  const series={};
+  PLAYERS.forEach(p=>{ series[p]=[0]; });
+  return{labels,series,isDemo:true};
+}
+
+function renderChart(){
+  const container = document.getElementById('chartContainer');
+  const canvas = document.getElementById('pointsChart');
+  if(!container||!canvas) return;
+
+  let hist = buildPointsHistory();
+  const isDemo = !hist || hist.labels.length < 2;
+  if(isDemo) hist = buildDemoHistory();
+
+  container.style.display='block';
+
+  const titleEl = container.querySelector('.chart-wrap-title');
+  if(titleEl) titleEl.innerHTML = 'Points Over Time';
+
+  if(_chart) _chart.destroy();
+  _chart = new Chart(canvas,{
+    type:'line',
+    data:{
+      labels:hist.labels,
+      datasets:PLAYERS.map(p=>({
+        label:p,
+        data:hist.series[p],
+        borderColor:pColor(p),
+        backgroundColor:'transparent',
+        borderWidth:2,
+        pointRadius:hist.labels.length>20?0:3,
+        pointBackgroundColor:pColor(p),
+        tension:0.35,
+      }))
+    },
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      interaction:{mode:'index',intersect:false},
+      plugins:{
+        legend:{
+          position:'top',
+          labels:{color:'#666',font:{family:'DM Sans',size:11},boxWidth:10,padding:14,usePointStyle:true}
+        },
+        tooltip:{
+          backgroundColor:'#1a1a1a',borderColor:'#333',borderWidth:1,
+          titleColor:'#fff',bodyColor:'#aaa',padding:10,
+          callbacks:{
+            title: items => items[0].label,
+            label: ctx=>` ${ctx.dataset.label}: ${ctx.raw} pts`
+          }
+        }
+      },
+      scales:{
+        x:{grid:{color:'rgba(255,255,255,0.04)'},ticks:{color:'#444',font:{family:'DM Sans',size:10}},border:{color:'#242424'}},
+        y:{grid:{color:'rgba(255,255,255,0.04)'},ticks:{color:'#444',font:{family:'DM Sans',size:10}},border:{color:'#242424'},beginAtZero:true}
+      }
+    }
+  });
+}
+
 // ══════════════════════════════════════════════════════
 //  SUPABASE
 // ══════════════════════════════════════════════════════
@@ -805,6 +1108,7 @@ async function fetchResults(){
     updateKOBracket();
     renderAll();
     renderFixtures();
+    renderChart();
     setStatus(matchCount>0?'OK '+matchCount+' results':'OK No results yet','#0064ff');
   }catch(e){
     setStatus('Could not load','#e05252');
@@ -844,7 +1148,7 @@ function renderLeaderboard(){
     const medal=i<3?medals[i]:'';
     return `<div class="lb-card ${rc}">
       <div class="lb-rank ${rc}">${medal} ${ordinal(i+1)} Place</div>
-      <div class="lb-name">${p}</div>
+      <div class="lb-name">${pDot(p,9)}${p}</div>
       <div class="lb-pts">${pts}<span class="lb-pts-label">PTS</span></div>
       <div class="lb-breakdown">
         Group <strong>${groupPts(p)}</strong> &nbsp;·&nbsp;
@@ -860,7 +1164,7 @@ function renderLeaderboard(){
   const tbl=document.getElementById('lbTable');
   const hRow='<tr><th class="left">Player</th><th>Group Stage</th><th>R32</th><th>R16</th><th>QF</th><th>SF</th><th>Final</th><th>TOTAL</th><th>Rank</th></tr>';
   const rows=ranked.map((p,i)=>`<tr>
-    <td class="left" style="font-weight:700;color:#e0e0e0">${p}</td>
+    <td class="left" style="font-weight:700;color:#e0e0e0">${pDot(p)}${p}</td>
     <td>${groupPts(p)}</td>
     <td>${koPts(p,'r32')}</td>
     <td>${koPts(p,'r16')}</td>
@@ -911,7 +1215,7 @@ function renderGroupTable(){
   let html='<thead><tr>'
     +'<th class="left" colspan="2">Group / Team</th>'
     +'<th class="mob-hide">W</th><th class="mob-hide">D</th><th class="mob-hide">L</th><th class="mob-hide">GD</th><th>Pts</th>';
-  PLAYERS.forEach(p=>{const dm=`data-me="${p===currentPlayer}"`;html+=`<th ${dm}>${p}</th><th ${dm} style="font-size:10px;color:#555">pts</th>`;});
+  PLAYERS.forEach(p=>{const dm=`data-me="${p===currentPlayer}"`;html+=`<th ${dm}>${pDot(p)}${p}</th><th ${dm} style="font-size:10px;color:#555">pts</th>`;});
   html+='</tr></thead><tbody>';
 
   GK.forEach(g=>{
@@ -951,7 +1255,8 @@ function renderGroupTable(){
         const cls=predCellClass(p,g,predPos);
         const pts=predPts(p,g,predPos);
         const isMe=p===currentPlayer;
-        const select=isMe
+        const locked=isLocked();
+        const select=(isMe&&!locked)
           ?`<select onchange="setPrediction('${p}','${g}',this.value,'${teamName}')" style="background:#1a1a1a;border:1px solid #333;color:#fff;font-size:11px;padding:2px 4px;border-radius:3px">`
             +displayOrder.map((t,i)=>`<option value="${i}" ${predPos===i?'selected':''}>${i+1}</option>`).join('')
             +'</select>'
@@ -1063,7 +1368,7 @@ function renderKnockout(){
     html+=`<div class="ko-section"><div class="ko-round-title">${label} <span style="font-size:13px;font-family:'DM Sans';color:#555;font-weight:400">${pts} pts each</span></div>`;
     html+='<div class="ss-wrap"><table class="ss">';
     html+='<thead><tr><th class="left" style="min-width:120px">Match</th><th>Result</th>';
-    PLAYERS.forEach(p=>{const dm=`data-me="${p===currentPlayer}"`;html+=`<th ${dm}>${p}</th><th ${dm} style="font-size:10px;color:#555">pts</th>`;});
+    PLAYERS.forEach(p=>{const dm=`data-me="${p===currentPlayer}"`;html+=`<th ${dm}>${pDot(p)}${p}</th><th ${dm} style="font-size:10px;color:#555">pts</th>`;});
     html+='</tr></thead><tbody>';
 
     matches.forEach((m,idx)=>{
@@ -1080,14 +1385,15 @@ function renderKnockout(){
         const playerTeams=getPlayerMatchTeams(p,round,idx);
         const available=playerTeams.filter(t=>t!=='TBD');
         const isMe=p===currentPlayer;
+        const locked=isLocked();
         const sel=available.length>0
-          ?(isMe
+          ?((isMe&&!locked)
             ?`<select onchange="setKOPick('${p}','${round}',${idx},this.value)" style="background:#1a1a1a;border:1px solid #333;color:#fff;font-size:11px;padding:2px 4px;border-radius:3px">`
               +`<option value="" ${!ppred?'selected':''}>--</option>`
               +available.map(t=>`<option value="${t}" ${ppred===t?'selected':''}>${t}</option>`).join('')
               +'</select>'
             :`<span style="font-size:11px">${ppred||'—'}</span>`)
-          :(isMe?'<span style="color:#555;font-size:10px">pick prev. round first</span>':'—');
+          :((isMe&&!locked)?'<span style="color:#555;font-size:10px">pick prev. round first</span>':'—');
         html+=`<td data-me="${p===currentPlayer}" class="${cls}" style="font-size:11px">${sel}</td>`
           +`<td data-me="${p===currentPlayer}" class="${cls}" style="font-weight:700;font-size:11px">${ptsTxt}</td>`;
       });
@@ -1190,6 +1496,7 @@ function showPage(id,btn){
 function renderAll(){
   renderLeaderboard();
   renderGroupTable();
+  renderMobileGroups();
   renderKnockout();
 }
 
@@ -1197,6 +1504,7 @@ function renderAll(){
 //  INIT
 // ══════════════════════════════════════════════════════
 (async()=>{
+  updateLockBanner();
   setStatus('Loading…');
   await loadPredictions();
   if(!currentPlayer||!PLAYERS.includes(currentPlayer)) showLogin();
