@@ -523,7 +523,12 @@ const PLAYER_COLORS = {
   'Will':    '#FD9644',
   'Steve':   '#26de81',
 };
-function pColor(name){ return PLAYER_COLORS[name]||'#888'; }
+function pColor(name){
+  if(PLAYER_COLORS[name]) return PLAYER_COLORS[name];
+  let hash=0;
+  for(let i=0;i<name.length;i++) hash=name.charCodeAt(i)+((hash<<5)-hash);
+  return `hsl(${Math.abs(hash)%360},70%,60%)`;
+}
 function pDot(name, size=8){
   return `<span class="p-dot" style="width:${size}px;height:${size}px;background:${pColor(name)}"></span>`;
 }
@@ -671,7 +676,7 @@ function buildPointsHistory(){
         const actual=snapG[g]; if(!actual) return;
         predictions[p][g].forEach((team,predPos)=>{
           const actPos=actual.indexOf(team); if(actPos===-1) return;
-          const pA=predPos<2,aA=actPos<2,pc=predPos===actPos;
+          const pA=predPos<2,aA=actPos<2||(actPos===2&&thirdPlaceAdvancers.has(team)),pc=predPos===actPos;
           if(pc&&aA)pts+=15; else if(pc)pts+=5; else if(pA&&aA)pts+=10;
         });
       });
@@ -927,6 +932,7 @@ function submitNewProfile(){
   GK.forEach(g=>{ predictions[name][g]=[...GROUPS[g].teams]; });
   koPredictions[name]={ r32:{}, r16:{}, qf:{}, sf:{}, final:null };
   selectPlayer(name);
+  savePredictions();
 }
 
 function selectPlayer(name){
@@ -977,7 +983,12 @@ async function loadPredictions(){
     if(error) throw error;
     (data||[]).forEach(row=>{
       const pl=row.player;
-      if(!PLAYERS.includes(pl)) return;
+      if(!PLAYERS.includes(pl)){
+        PLAYERS.push(pl);
+        predictions[pl]={};
+        GK.forEach(g=>{ predictions[pl][g]=[...GROUPS[g].teams]; });
+        koPredictions[pl]={ r32:{}, r16:{}, qf:{}, sf:{}, final:null };
+      }
       if(row.group_preds) GK.forEach(g=>{
         if(row.group_preds[g]&&row.group_preds[g].length===4)
           predictions[pl][g]=row.group_preds[g];
@@ -1114,6 +1125,7 @@ async function fetchResults(){
     setStatus('Could not load','#e05252');
     renderAll();
     renderFixtures();
+    renderChart();
   }
 }
 
@@ -1191,7 +1203,8 @@ function predCellClass(player, g, predPos){
   const team=predictions[player][g][predPos];
   const actPos=actual.indexOf(team);
   const posCorrect=actPos===predPos;
-  const predAdv=predPos<2, actAdv=actPos<2;
+  const predAdv=predPos<2;
+  const actAdv=actPos<2||(actPos===2&&thirdPlaceAdvancers.has(team));
   if(posCorrect&&actAdv) return 'pred-15';
   if(posCorrect)          return 'pred-5';
   if(predAdv&&actAdv)     return 'pred-10';
@@ -1203,7 +1216,8 @@ function predPts(player,g,predPos){
   const team=predictions[player][g][predPos];
   const actPos=actual.indexOf(team);
   const posCorrect=actPos===predPos;
-  const predAdv=predPos<2, actAdv=actPos<2;
+  const predAdv=predPos<2;
+  const actAdv=actPos<2||(actPos===2&&thirdPlaceAdvancers.has(team));
   if(posCorrect&&actAdv) return '15';
   if(posCorrect)          return '5';
   if(predAdv&&actAdv)     return '10';
@@ -1292,6 +1306,7 @@ function setPrediction(player, g, newPosStr, teamName){
   pred[oldPos]=displaced;
   savePredictions();
   renderGroupTable();
+  renderMobileGroups();
   renderLeaderboard();
 }
 
@@ -1505,6 +1520,7 @@ function renderAll(){
 // ══════════════════════════════════════════════════════
 (async()=>{
   updateLockBanner();
+  setInterval(updateLockBanner, 3600000);
   setStatus('Loading…');
   await loadPredictions();
   if(!currentPlayer||!PLAYERS.includes(currentPlayer)) showLogin();
