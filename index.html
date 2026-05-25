@@ -355,6 +355,7 @@ body.my-picks-only table.ss [data-me="false"] { display: none; }
 .bk-sep { height:1px; background:#1e1e1e; flex-shrink:0; }
 .bk-tbd-dot { display:inline-block; width:13px; height:13px; background:#222; border-radius:50%; flex-shrink:0; }
 .bk-tname { overflow:hidden; text-overflow:ellipsis; }
+.bk-venue { padding:2px 7px 3px; font-size:9px; color:#3a3a3a; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; letter-spacing:.03em; border-top:1px solid #1e1e1e; }
 </style>
 </head>
 <body style="background:#0d0d0d;color:#fff;font-family:'DM Sans',sans-serif;margin:0">
@@ -1507,8 +1508,17 @@ function clearInvalidDownstreamPicks(player, changedRound, changedIdx){
 //  BRACKET VISUALIZATION
 // ══════════════════════════════════════════════════════
 function renderBracket(){
-  const UNIT=62, CARD_H=46, CARD_W=155, GAP=20;
+  const UNIT=74, CARD_H=58, CARD_W=155, GAP=20;
   const totalH=16*UNIT, totalW=(CARD_W+GAP)*4+CARD_W;
+
+  // Venue for each match (R32 from user-provided schedule; R16+ from knockout schedule)
+  const VENUES={
+    r32:['Los Angeles','Boston','Monterrey','Houston','New York/NJ','Dallas','Mexico City','Atlanta','San Francisco','Seattle','Toronto','Los Angeles','Vancouver','Miami','Kansas City','Dallas'],
+    r16:['Philadelphia','Houston','New York/NJ','Mexico City','Dallas','Seattle','Atlanta','Vancouver'],
+    qf: ['Boston','Los Angeles','Miami','Kansas City'],
+    sf: ['Dallas','Atlanta'],
+    final:['New York/NJ'],
+  };
 
   // Visual ordering of match indices top-to-bottom for each round
   // R32: which match index appears at each visual slot 0–15
@@ -1537,36 +1547,44 @@ function renderBracket(){
     const left=cx(round);
     let h=`<div class="bk-card" style="top:${top}px;left:${left}px;width:${CARD_W}px">`;
     [0,1].forEach(i=>{
-      const t=teams[i]||'TBD';
+      const rawT=teams[i]||'TBD';
+      const is3rdSlot=round==='r32'&&i===1&&!!R32_THIRD_GROUPS[matchIdx];
+      // If this is a 3rd-place slot and the player has already picked a candidate,
+      // surface that team as the visible slot team so it can be deselected normally
+      const grps3=is3rdSlot?R32_THIRD_GROUPS[matchIdx]:null;
+      const cands3=grps3?grps3.map(g=>actualGroups[g]?.[2]??predictions[currentPlayer]?.[g]?.[2]).filter(Boolean):null;
+      const pickIs3rd=is3rdSlot&&rawT==='TBD'&&pick&&cands3?.includes(pick);
+      const t=pickIs3rd?pick:rawT;
+
       const isPick=!actual&&t!=='TBD'&&pick===t;
       const isWin =actual&&actual===t;
       const isLose=actual&&actual!==t&&t!=='TBD';
       const canClick=!locked&&t!=='TBD'&&!actual;
       const cls=`bk-team${isPick?' bk-pick':''}${isWin?' bk-winner':''}${isLose?' bk-loser':''}`;
       const idxArg=round==='final'?0:matchIdx;
+
       let inner;
       if(t!=='TBD'){
         inner=`${flagCircle(t,13)}<span class="bk-tname">${t}</span>`;
-      } else if(round==='r32'&&i===1&&R32_THIRD_GROUPS[matchIdx]){
-        const grps=R32_THIRD_GROUPS[matchIdx];
-        const cands=grps.map(g=>actualGroups[g]?.[2]??predictions[currentPlayer]?.[g]?.[2]).filter(Boolean);
-        const candFlags=cands.map(c=>{
-          const isSel=!actual&&pick===c;
+      } else if(is3rdSlot){
+        // No pick yet — show each candidate as an individually clickable flag
+        const candFlags=(cands3||[]).map(c=>{
           const canPickC=!locked&&!actual;
-          const ring=isSel?';box-shadow:0 0 0 2px #0064ff':'';
           const oc=canPickC?`onclick="toggleKOPick('${esc(currentPlayer)}','r32',${matchIdx},'${esc(c)}')" title="Click to pick / deselect"`:'';
-          return `<span ${oc} style="display:inline-block;border-radius:50%;${canPickC?'cursor:pointer;':''}${ring}">${flagCircle(c,12)}</span>`;
+          return `<span ${oc} style="display:inline-block;border-radius:50%;${canPickC?'cursor:pointer;':''}flex-shrink:0">${flagCircle(c,12)}</span>`;
         }).join('');
-        const flagRow=cands.length
+        const flagRow=(cands3||[]).length
           ?`<span style="display:inline-flex;gap:3px;flex-shrink:0;align-items:center">${candFlags}</span>`
           :`<span class="bk-tbd-dot"></span>`;
-        inner=`${flagRow}<span class="bk-tname" style="color:#555;font-size:9px">3rd ${grps.join('/')}</span>`;
+        inner=`${flagRow}<span class="bk-tname" style="color:#555;font-size:9px">3rd ${grps3.join('/')}</span>`;
       } else {
         inner=`<span class="bk-tbd-dot"></span><span class="bk-tname" style="color:#444">TBD</span>`;
       }
       h+=`<div class="${cls}"${canClick?` onclick="toggleKOPick('${esc(currentPlayer)}','${round}',${idxArg},'${esc(t)}')" title="Click to pick / deselect"`:''}>${inner}</div>`;
       if(i===0) h+=`<div class="bk-sep"></div>`;
     });
+    const venue=VENUES[round]?.[round==='final'?0:matchIdx];
+    if(venue) h+=`<div class="bk-venue">${venue}</div>`;
     return h+'</div>';
   };
 
