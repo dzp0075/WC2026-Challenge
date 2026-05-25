@@ -75,7 +75,7 @@
   background: #0a0a0a;
   border-bottom: 1px solid var(--line);
   padding: 0 1.5rem;
-  height: 56px;
+  height: 80px;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -84,11 +84,11 @@
   z-index: 300;
 }
 .logo-mark {
-  width: 34px; height: 34px; border-radius: 6px;
-  background: var(--blue);
+  width: 64px; height: 64px;
   display: flex; align-items: center; justify-content: center;
-  font-size: 18px;
-  box-shadow: 0 0 0 1px rgba(0,100,255,0.3), 0 4px 12px rgba(0,100,255,0.25);
+}
+.logo-mark img {
+  width: 100%; height: 100%; object-fit: contain; filter: drop-shadow(0 2px 6px rgba(0,100,255,0.3));
 }
 .logo-title { font-family: 'Oswald', sans-serif; font-size: 17px; font-weight: 700; letter-spacing: 0.1em; line-height: 1; color: #fff; }
 .logo-title em { color: var(--blue); font-style: normal; }
@@ -328,8 +328,8 @@ body.my-picks-only table.ss [data-me="false"] { display: none; }
 @media (max-width: 680px) {
   .mob-hide { display: none !important; }
   .page-inner { padding: 1rem .875rem 5rem; }
-  .site-header { padding: 0 .875rem; }
-  .logo-mark { width: 28px; height: 28px; font-size: 15px; }
+  .site-header { padding: 0 .875rem; height: 64px; }
+  .logo-mark { width: 48px; height: 48px; }
   .logo-title { font-size: 14px; }
   .logo-sub { display: none; }
   #api-status { display: none; }
@@ -398,7 +398,7 @@ body.my-picks-only table.ss [data-me="false"] { display: none; }
 <!-- ══ HEADER ══ -->
 <header class="site-header">
   <div style="display:flex;align-items:center;gap:12px">
-    <div class="logo-mark">⚽</div>
+    <div class="logo-mark"><img src="logo.svg.png" alt="FIFA World Cup 2026"></div>
     <div>
       <div class="logo-title">WC <em>2026</em> PREDICTOR</div>
       <div class="logo-sub">USA · Canada · Mexico</div>
