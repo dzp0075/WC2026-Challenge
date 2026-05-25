@@ -303,6 +303,10 @@ select:focus { border-color: var(--blue); }
 .mg-pos.adv span { box-shadow: 0 0 0 2px var(--blue); }
 .mg-name { flex:1; font-size:12px; font-weight:600; color:#ccc; }
 .mg-pts-badge { font-family:'Oswald',sans-serif; font-size:13px; font-weight:700; padding:2px 7px; border-radius:4px; }
+.mg-reorder { display:flex; flex-direction:column; gap:2px; flex-shrink:0; }
+.mg-btn { background:#1e1e1e; border:1px solid #333; color:#888; font-size:10px; line-height:1; padding:3px 6px; border-radius:3px; cursor:pointer; touch-action:manipulation; }
+.mg-btn:active { background:#2a2a2a; color:#fff; }
+.mg-btn:disabled { opacity:0.2; cursor:default; }
 
 /* ── Prediction cell colours ── */
 .pred-15 { background: var(--c-15) !important; color: #4dffaa; }
@@ -407,7 +411,7 @@ body.my-picks-only table.ss [data-me="false"] { display: none; }
     <div class="section-title">Leaderboard</div>
     <div class="section-sub">Points update automatically as results come in</div>
     <div id="lbGrid" class="lb-grid"></div>
-    <div class="ss-wrap"><table class="ss" id="lbTable"></table></div>
+    <div class="ss-wrap mob-hide"><table class="ss" id="lbTable"></table></div>
     <div class="chart-wrap" id="chartContainer" style="display:none">
       <div class="chart-wrap-title">Points Over Time</div>
       <div style="position:relative;height:280px"><canvas id="pointsChart"></canvas></div>
@@ -609,6 +613,7 @@ function renderMobileGroups(){
           ${gpts!==null ? `<span style="color:#fff;font-size:14px">${gpts} pts</span>` : ''}
         </span>
       </div>`;
+    const canEdit = !actual && !!currentPlayer && !isLocked();
     displayOrder.forEach((teamName, pos)=>{
       const predPos = pred ? pred.indexOf(teamName) : pos;
       const cls = actual ? predCellClass(currentPlayer, g, predPos) : '';
@@ -620,13 +625,20 @@ function renderMobileGroups(){
       else if(cls==='pred-10'){ ptsBadgeStyle='background:var(--c-10)'; ptsColor='color:#86e870'; }
       else if(cls==='pred-5'){ ptsBadgeStyle='background:var(--c-5)'; ptsColor='color:#f5c842'; }
       else if(cls==='pred-0'){ ptsBadgeStyle='background:var(--c-0)'; ptsColor='color:#ff5f5f'; }
+      const reorderBtns = canEdit
+        ? `<div class="mg-reorder">
+            <button class="mg-btn" ${predPos===0?'disabled':''} onclick="setPrediction('${esc(currentPlayer)}','${g}',${predPos-1},'${esc(teamName)}')">▲</button>
+            <button class="mg-btn" ${predPos===3?'disabled':''} onclick="setPrediction('${esc(currentPlayer)}','${g}',${predPos+1},'${esc(teamName)}')">▼</button>
+           </div>`
+        : '';
       html += `<div class="mg-row">
         <div class="mg-pos ${adv?'adv':''}">${flagCircle(teamName, 24)}</div>
         <div class="mg-name">${teamName}</div>
         ${actual
           ? `<div class="mg-pts-badge" style="${ptsBadgeStyle};${ptsColor}">${pts} pts</div>`
-          : (pred ? `<div style="font-size:10px;color:#404040">Pred: ${predPos+1}</div>` : '')
+          : ''
         }
+        ${reorderBtns}
       </div>`;
     });
     html += '</div>';
@@ -818,9 +830,9 @@ const GK = Object.keys(GROUPS);
 // Flags
 const FLAGS={
   'Mexico':'MX','South Africa':'ZA','South Korea':'KR','Czech Republic':'CZ',
-  'Canada':'CA','Switzerland':'CH','Qatar':'QA','Bosnia-Herzegovina':'BA',
+  'Canada':'CA','Switzerland':'CH','Qatar':'QA','Bosnia-Herzegovina':'BA','Bosnia and Herzegovina':'BA','Bosnia & Herzegovina':'BA',
   'Brazil':'BR','Morocco':'MA','Scotland':null,'Haiti':'HT','USA':'US',
-  'Paraguay':'PY','Australia':'AU','Turkey':'TR','Germany':'DE','Curacao':'CW',
+  'Paraguay':'PY','Australia':'AU','Turkey':'TR','Germany':'DE','Curacao':'CW','Curaçao':'CW',
   'Ivory Coast':'CI','Ecuador':'EC','Netherlands':'NL','Japan':'JP',
   'Tunisia':'TN','Sweden':'SE','Belgium':'BE','Egypt':'EG','Iran':'IR',
   'New Zealand':'NZ','Spain':'ES','Cape Verde':'CV','Saudi Arabia':'SA',
@@ -1092,10 +1104,10 @@ let allFixtures=[];
 const OFB_MAP={
   'Mexico':'Mexico','South Africa':'South Africa','South Korea':'South Korea',
   'Czech Republic':'Czech Republic','Canada':'Canada','Switzerland':'Switzerland',
-  'Qatar':'Qatar','Bosnia and Herzegovina':'Bosnia-Herzegovina',
+  'Qatar':'Qatar','Bosnia and Herzegovina':'Bosnia-Herzegovina','Bosnia & Herzegovina':'Bosnia-Herzegovina',
   'Brazil':'Brazil','Morocco':'Morocco','Scotland':'Scotland','Haiti':'Haiti',
   'USA':'USA','Paraguay':'Paraguay','Australia':'Australia','Turkey':'Turkey','Turkiye':'Turkey',
-  'Germany':'Germany','Curacao':'Curacao','Ivory Coast':'Ivory Coast',
+  'Germany':'Germany','Curacao':'Curacao','Curaçao':'Curacao','Ivory Coast':'Ivory Coast',
   "Cote d'Ivoire":'Ivory Coast',"Cote d`ivoire":'Ivory Coast','Ecuador':'Ecuador',
   'Netherlands':'Netherlands','Japan':'Japan','Tunisia':'Tunisia','Sweden':'Sweden',
   'Belgium':'Belgium','Egypt':'Egypt','Iran':'Iran','New Zealand':'New Zealand',
@@ -1788,9 +1800,9 @@ function renderFixtures(){
     return `<tr style="${rowStyle}">
       <td class="left" style="white-space:nowrap;color:#555">${fmt(m.date)}</td>
       <td class="left mob-hide" style="font-size:11px;color:#555">${roundLabel}</td>
-      <td class="left"><span style="margin-right:4px">${flag(ofbMap(m.team1))}</span>${ofbMap(m.team1)}</td>
+      <td class="left" style="white-space:nowrap">${flagCircle(ofbMap(m.team1),16)} ${ofbMap(m.team1)}</td>
       <td style="font-size:13px;min-width:50px">${score}</td>
-      <td class="left"><span style="margin-right:4px">${flag(ofbMap(m.team2))}</span>${ofbMap(m.team2)}</td>
+      <td class="left" style="white-space:nowrap">${flagCircle(ofbMap(m.team2),16)} ${ofbMap(m.team2)}</td>
       <td class="left mob-hide" style="font-size:11px;color:#555">${venue}</td>
     </tr>`;
   }).join('');
