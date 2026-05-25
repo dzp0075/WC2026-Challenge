@@ -554,7 +554,7 @@ function pColor(name){
 function pDot(name, size=8){
   return `<span class="p-dot" style="width:${size}px;height:${size}px;background:${pColor(name)}"></span>`;
 }
-function esc(s){ return String(s).replace(/\\/g,'\\\\').replace(/'/g,"\\'"); }
+function esc(s){ return String(s).replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/"/g,'&quot;'); }
 function flagCircle(name, size=18){
   let code;
   if(name==='Scotland') code='gb-sct';
@@ -1138,7 +1138,6 @@ async function fetchResults(){
 
     allFixtures=data.matches||[];
     let matchCount=0;
-    const koRoundCounts={r32:0,r16:0,qf:0,sf:0};
     const koFixtureCount={r32:0,r16:0,qf:0,sf:0};
     (data.matches||[]).forEach(m=>{
       const hn=ofbMap(m.team1), an=ofbMap(m.team2);
@@ -1158,10 +1157,10 @@ async function fetchResults(){
         grp[mi].sh=hs; grp[mi].sa=as_; matchCount++;
       } else if(m.round){
         const round=KO_ROUND_MAP[m.round]; if(!round) return;
-        // Assign teams from feed when actual names are known (not placeholder codes)
+        const fi=round!=='final'?koFixtureCount[round]:0;
         if(FLAGS.hasOwnProperty(hn)&&FLAGS.hasOwnProperty(an)){
           if(round==='final') koMatches.final.teams=[hn,an];
-          else{ const fi=koFixtureCount[round]; if(fi<koMatches[round].length) koMatches[round][fi].teams=[hn,an]; }
+          else{ if(fi<koMatches[round].length) koMatches[round][fi].teams=[hn,an]; }
         }
         if(round!=='final') koFixtureCount[round]++;
         if(!m.score||!m.score.ft) return;
@@ -1169,7 +1168,7 @@ async function fetchResults(){
         if(typeof hs!=='number'||typeof as_!=='number') return;
         const winner=koWinner(m,hn,an);
         if(round==='final') actualKO.final=winner;
-        else{ actualKO[round][koRoundCounts[round]++]=winner; }
+        else{ actualKO[round][fi]=winner; }
         matchCount++;
       }
     });
@@ -1417,9 +1416,25 @@ function setPrediction(player, g, newPosStr, teamName){
   const pred=predictions[player][g];
   const oldPos=pred.indexOf(teamName);
   if(oldPos===newPos) return;
+  const old3rd=pred[2];
   const displaced=pred[newPos];
   pred[newPos]=teamName;
   pred[oldPos]=displaced;
+  const new3rd=pred[2];
+  // Clear any R32 3rd-place KO pick for this group that is now invalid
+  if(old3rd!==new3rd){
+    Object.entries(R32_THIRD_GROUPS).forEach(([mi,grps])=>{
+      if(!grps.includes(g)) return;
+      const cur=(koPredictions[player].r32||{})[mi];
+      if(!cur) return;
+      const cands=grps.map(grp=>actualGroups[grp]?.[2]??predictions[player]?.[grp]?.[2]).filter(Boolean);
+      if(!cands.includes(cur)){
+        if(!koPredictions[player].r32) koPredictions[player].r32={};
+        koPredictions[player].r32[parseInt(mi)]=null;
+        clearInvalidDownstreamPicks(player,'r32',parseInt(mi));
+      }
+    });
+  }
   savePredictions();
   renderGroupTable();
   renderMobileGroups();
