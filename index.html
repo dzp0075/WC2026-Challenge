@@ -1491,11 +1491,9 @@ function setPrediction(player, g, newPosStr, teamName){
   const pred=predictions[player][g];
   const oldPos=pred.indexOf(teamName);
   if(oldPos===newPos) return;
-  const old3rd=pred[2];
   const displaced=pred[newPos];
   pred[newPos]=teamName;
   pred[oldPos]=displaced;
-  const new3rd=pred[2];
   savePredictions();
   renderGroupTable();
   renderMobileGroups();
@@ -1881,7 +1879,7 @@ function renderFixtures(){
   if(!tbody) return;
   const filter=(document.getElementById('fixtureFilter')||{}).value||'all';
 
-  let matches=allFixtures;
+  let matches=[...allFixtures].sort((a,b)=>new Date(a.date)-new Date(b.date));
   if(filter==='knockout') matches=matches.filter(m=>!m.group);
   else if(filter!=='all')  matches=matches.filter(m=>m.group===filter);
 
