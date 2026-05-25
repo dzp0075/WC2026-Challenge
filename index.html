@@ -1268,6 +1268,9 @@ async function fetchResults(){
         if(!pick) continue;
         const teams=getPlayerMatchTeams(player,'r32',i);
         if(!teams.includes(pick)){
+          // 3rd-place slot picks are predictions and must never be auto-cleared —
+          // a wrong pick simply scores 0.
+          if(R32_THIRD_GROUPS[i]) continue;
           if(!koPredictions[player].r32) koPredictions[player].r32={};
           koPredictions[player].r32[i]=null;
           clearInvalidDownstreamPicks(player,'r32',i);
@@ -1493,20 +1496,6 @@ function setPrediction(player, g, newPosStr, teamName){
   pred[newPos]=teamName;
   pred[oldPos]=displaced;
   const new3rd=pred[2];
-  // Clear any R32 3rd-place KO pick for this group that is now invalid
-  if(old3rd!==new3rd){
-    Object.entries(R32_THIRD_GROUPS).forEach(([mi,grps])=>{
-      if(!grps.includes(g)) return;
-      const cur=(koPredictions[player].r32||{})[mi];
-      if(!cur) return;
-      const cands=grps.map(grp=>actualGroups[grp]?.[2]??predictions[player]?.[grp]?.[2]).filter(Boolean);
-      if(!cands.includes(cur)){
-        if(!koPredictions[player].r32) koPredictions[player].r32={};
-        koPredictions[player].r32[parseInt(mi)]=null;
-        clearInvalidDownstreamPicks(player,'r32',parseInt(mi));
-      }
-    });
-  }
   savePredictions();
   renderGroupTable();
   renderMobileGroups();
@@ -1631,7 +1620,7 @@ function renderBracket(){
       const is3rdSlot=round==='r32'&&i===1&&!!R32_THIRD_GROUPS[matchIdx];
       const grps3=is3rdSlot?R32_THIRD_GROUPS[matchIdx]:null;
       const cands3=grps3?grps3.map(g=>actualGroups[g]?.[2]??predictions[currentPlayer]?.[g]?.[2]).filter(Boolean):null;
-      const pickIs3rd=is3rdSlot&&rawT==='TBD'&&pick&&cands3?.includes(pick);
+      const pickIs3rd=is3rdSlot&&rawT==='TBD'&&!!pick;
       const t=pickIs3rd?pick:rawT;
       const isPick=!actual&&t!=='TBD'&&pick===t;
       const isWin=actual&&actual===t;
@@ -1753,7 +1742,7 @@ function renderMobileKO(){
         const is3rdSlot=round==='r32'&&i===1&&!!R32_THIRD_GROUPS[matchIdx];
         const grps3=is3rdSlot?R32_THIRD_GROUPS[matchIdx]:null;
         const cands3=grps3?grps3.map(g=>actualGroups[g]?.[2]??predictions[currentPlayer]?.[g]?.[2]).filter(Boolean):null;
-        const pickIs3rd=is3rdSlot&&rawT==='TBD'&&pick&&cands3?.includes(pick);
+        const pickIs3rd=is3rdSlot&&rawT==='TBD'&&!!pick;
         const t=pickIs3rd?pick:rawT;
         const isPick=!actual&&t!=='TBD'&&pick===t;
         const isWin=actual&&actual===t;
