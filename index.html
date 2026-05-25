@@ -339,6 +339,22 @@ body.my-picks-only table.ss [data-me="false"] { display: none; }
   table.ss select { min-height: unset; font-size: 11px; padding: 3px 4px; }
   .ko-section { margin-bottom: 1.25rem; }
 }
+
+/* ── Bracket ── */
+.bk-outer { margin-bottom: 2rem; }
+.bk-hdr { display:flex; margin-bottom:8px; }
+.bk-hdr-cell { font-family:'Oswald',sans-serif; font-size:10px; font-weight:700; letter-spacing:.12em; color:#444; text-transform:uppercase; text-align:center; flex-shrink:0; }
+.bk-scroll { overflow-x:auto; padding:16px 12px 12px; background:#0c0c0c; border:1px solid #1c1c1c; border-radius:8px; }
+.bk-card { position:absolute; background:#161616; border:1px solid #242424; border-radius:5px; overflow:hidden; display:flex; flex-direction:column; }
+.bk-team { display:flex; align-items:center; gap:5px; padding:3px 7px; font-size:11px; min-height:22px; white-space:nowrap; overflow:hidden; }
+.bk-team[onclick] { cursor:pointer; }
+.bk-team[onclick]:hover { background:rgba(255,255,255,0.06); }
+.bk-pick { background:rgba(0,100,255,0.18) !important; }
+.bk-winner { background:rgba(30,190,100,0.2) !important; font-weight:700; }
+.bk-loser { opacity:0.28; }
+.bk-sep { height:1px; background:#1e1e1e; flex-shrink:0; }
+.bk-tbd-dot { display:inline-block; width:13px; height:13px; background:#222; border-radius:50%; flex-shrink:0; }
+.bk-tname { overflow:hidden; text-overflow:ellipsis; }
 </style>
 </head>
 <body style="background:#0d0d0d;color:#fff;font-family:'DM Sans',sans-serif;margin:0">
@@ -477,6 +493,11 @@ body.my-picks-only table.ss [data-me="false"] { display: none; }
         <div style="font-family:'Oswald',sans-serif;font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#555;margin-bottom:4px">Round of 32</div>
         <div style="font-size:11px;color:#aaa;margin-bottom:6px">Correct match winner</div>
         <div style="font-family:'Oswald',sans-serif;font-size:30px;font-weight:700;color:#fff;line-height:1">20 <span style="font-size:13px;color:#555">pts</span></div>
+      </div>
+      <div class="lb-card" style="background:#131313;border:1px solid #242424">
+        <div style="font-family:'Oswald',sans-serif;font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#555;margin-bottom:4px">Round of 16</div>
+        <div style="font-size:11px;color:#aaa;margin-bottom:6px">Correct match winner</div>
+        <div style="font-family:'Oswald',sans-serif;font-size:30px;font-weight:700;color:#fff;line-height:1">30 <span style="font-size:13px;color:#555">pts</span></div>
       </div>
       <div class="lb-card" style="background:#131313;border:1px solid #242424">
         <div style="font-family:'Oswald',sans-serif;font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#555;margin-bottom:4px">Quarterfinal</div>
@@ -843,6 +864,41 @@ PLAYERS.forEach(p=>{
 const KO_ROUNDS = ['r32','r16','qf','sf'];
 const KO_LABELS = {r32:'Round of 32',r16:'Round of 16',qf:'Quarterfinals',sf:'Semifinals'};
 const KO_PTS    = {r32:20,r16:30,qf:30,sf:40,final:50};
+// Maps R32 match index → possible groups the 3rd-place opponent comes from
+const R32_THIRD_GROUPS = {
+  1:  ['A','B','C','D','F'],
+  4:  ['C','D','F','G','H'],
+  6:  ['C','E','F','H','I'],
+  7:  ['E','H','I','J','K'],
+  8:  ['B','E','F','I','J'],
+  9:  ['A','E','H','I','J'],
+  12: ['E','F','G','I','J'],
+  14: ['D','E','I','J','L'],
+};
+// Which two prior-round match indices feed each match in each KO round
+// R16: based on real WC 2026 schedule (W73–W88 = R32 match indices 0–15)
+//   R16[0] Philadelphia: W74 vs W77 → R32[1] vs R32[4]
+//   R16[1] Houston:      W73 vs W75 → R32[0] vs R32[2]
+//   R16[2] New York:     W76 vs W78 → R32[3] vs R32[5]
+//   R16[3] Mexico City:  W79 vs W80 → R32[6] vs R32[7]
+//   R16[4] Dallas:       W83 vs W84 → R32[10] vs R32[11]
+//   R16[5] Seattle:      W81 vs W82 → R32[8] vs R32[9]
+//   R16[6] Atlanta:      W86 vs W88 → R32[13] vs R32[15]
+//   R16[7] Vancouver:    W85 vs W87 → R32[12] vs R32[14]
+// QF:  QF[0] Boston: R16[0] vs R16[1]  QF[1] LA: R16[4] vs R16[5]
+//      QF[2] Miami:  R16[2] vs R16[3]  QF[3] KC: R16[6] vs R16[7]
+// SF:  SF[0] Dallas: QF[0] vs QF[1]    SF[1] Atlanta: QF[2] vs QF[3]
+const KO_SEEDS = {
+  r16: [[1,4],[0,2],[3,5],[6,7],[10,11],[8,9],[13,15],[12,14]],
+  qf:  [[0,1],[4,5],[2,3],[6,7]],
+  sf:  [[0,1],[2,3]],
+};
+// Reverse of KO_SEEDS: for each match index, which next-round match its winner advances to
+const KO_NEXT = {
+  r32: [1,0,1,2,0,2,3,3,5,5,4,4,7,6,7,6],
+  r16: [0,0,2,2,1,1,3,3],
+  qf:  [0,0,1,1],
+};
 const koMatches = {
   r32: Array.from({length:16},()=>({teams:['TBD','TBD'],result:null})),
   r16: Array.from({length:8}, ()=>({teams:['TBD','TBD'],result:null})),
@@ -899,6 +955,28 @@ function koPts(player,round){
   const n=koMatches[round].length;
   for(let i=0;i<n;i++) pts+=calcKOPoints(player,round,i);
   return pts;
+}
+function koCorrect(player,round){
+  if(round==='final') return calcKOPoints(player,'final',null)>0?1:0;
+  const n=koMatches[round].length; let c=0;
+  for(let i=0;i<n;i++) if(calcKOPoints(player,round,i)>0) c++;
+  return c;
+}
+function exactGroupPredictions(player){
+  let n=0;
+  GK.forEach(g=>{
+    const actual=actualGroups[g]; if(!actual) return;
+    predictions[player][g].forEach((team,pos)=>{ if(actual[pos]===team) n++; });
+  });
+  return n;
+}
+function tiebreak(a,b){
+  let d;
+  d=koCorrect(b,'final')-koCorrect(a,'final'); if(d) return d;
+  d=koCorrect(b,'sf')-koCorrect(a,'sf');       if(d) return d;
+  d=koCorrect(b,'qf')-koCorrect(a,'qf');       if(d) return d;
+  d=koCorrect(b,'r32')-koCorrect(a,'r32');     if(d) return d;
+  return exactGroupPredictions(b)-exactGroupPredictions(a);
 }
 
 // ══════════════════════════════════════════════════════
@@ -1054,17 +1132,19 @@ async function fetchResults(){
 
     GK.forEach(g=>groupScores[g].forEach(m=>{m.sh='';m.sa='';}));
     Object.assign(actualKO,{r32:{},r16:{},qf:{},sf:{},final:null});
+    ['r32','r16','qf','sf'].forEach(r=>koMatches[r].forEach(m=>{m.teams=['TBD','TBD'];}));
+    koMatches.final.teams=['TBD','TBD'];
 
     allFixtures=data.matches||[];
     let matchCount=0;
     const koRoundCounts={r32:0,r16:0,qf:0,sf:0};
+    const koFixtureCount={r32:0,r16:0,qf:0,sf:0};
     (data.matches||[]).forEach(m=>{
-      if(!m.score||!m.score.ft) return;
       const hn=ofbMap(m.team1), an=ofbMap(m.team2);
-      const hs=m.score.ft[0], as_=m.score.ft[1];
-      if(typeof hs!=='number'||typeof as_!=='number') return;
-
       if(m.group){
+        if(!m.score||!m.score.ft) return;
+        const hs=m.score.ft[0], as_=m.score.ft[1];
+        if(typeof hs!=='number'||typeof as_!=='number') return;
         const gLetter=m.group.replace('Group ','');
         const grp=groupScores[gLetter];
         if(!grp) return;
@@ -1075,16 +1155,20 @@ async function fetchResults(){
         const mi=grp.findIndex(x=>x.h===hi&&x.a===ai);
         if(mi===-1) return;
         grp[mi].sh=hs; grp[mi].sa=as_; matchCount++;
-      } else if(!m.group && m.round){
-        const round=KO_ROUND_MAP[m.round];
-        if(!round) return;
-        const winner=koWinner(m,hn,an);
-        if(round==='final'){
-          actualKO.final=winner;
-        } else {
-          const idx=koRoundCounts[round]++;
-          actualKO[round][idx]=winner;
+      } else if(m.round){
+        const round=KO_ROUND_MAP[m.round]; if(!round) return;
+        // Assign teams from feed when actual names are known (not placeholder codes)
+        if(FLAGS.hasOwnProperty(hn)&&FLAGS.hasOwnProperty(an)){
+          if(round==='final') koMatches.final.teams=[hn,an];
+          else{ const fi=koFixtureCount[round]; if(fi<koMatches[round].length) koMatches[round][fi].teams=[hn,an]; }
         }
+        if(round!=='final') koFixtureCount[round]++;
+        if(!m.score||!m.score.ft) return;
+        const hs=m.score.ft[0],as_=m.score.ft[1];
+        if(typeof hs!=='number'||typeof as_!=='number') return;
+        const winner=koWinner(m,hn,an);
+        if(round==='final') actualKO.final=winner;
+        else{ actualKO[round][koRoundCounts[round]++]=winner; }
         matchCount++;
       }
     });
@@ -1108,20 +1192,23 @@ async function fetchResults(){
     });
 
     thirdPlaceAdvancers.clear();
-    const thirds=GK.filter(g=>actualGroups[g]).map(g=>{
-      const name=actualGroups[g][2];
-      const ti=GROUPS[g].teams.indexOf(name);
-      let pts=0,gd=0,gf=0;
-      groupScores[g].forEach(m=>{
-        const h=parseInt(m.sh),a=parseInt(m.sa);
-        if(isNaN(h)||isNaN(a)) return;
-        if(m.h===ti){gf+=h;gd+=h-a;pts+=h>a?3:h===a?1:0;}
-        if(m.a===ti){gf+=a;gd+=a-h;pts+=a>h?3:a===h?1:0;}
+    const completedGroups=GK.filter(g=>actualGroups[g]);
+    if(completedGroups.length===12){
+      const thirds=completedGroups.map(g=>{
+        const name=actualGroups[g][2];
+        const ti=GROUPS[g].teams.indexOf(name);
+        let pts=0,gd=0,gf=0;
+        groupScores[g].forEach(m=>{
+          const h=parseInt(m.sh),a=parseInt(m.sa);
+          if(isNaN(h)||isNaN(a)) return;
+          if(m.h===ti){gf+=h;gd+=h-a;pts+=h>a?3:h===a?1:0;}
+          if(m.a===ti){gf+=a;gd+=a-h;pts+=a>h?3:a===h?1:0;}
+        });
+        return{name,pts,gd,gf};
       });
-      return{name,pts,gd,gf};
-    });
-    thirds.sort((a,b)=>b.pts-a.pts||b.gd-a.gd||b.gf-a.gf)
-      .slice(0,8).forEach(t=>thirdPlaceAdvancers.add(t.name));
+      thirds.sort((a,b)=>b.pts-a.pts||b.gd-a.gd||b.gf-a.gf)
+        .slice(0,8).forEach(t=>thirdPlaceAdvancers.add(t.name));
+    }
 
     updateKOBracket();
     renderAll();
@@ -1137,25 +1224,46 @@ async function fetchResults(){
 }
 
 function updateKOBracket(){
+  // Only fills known 1st/2nd-place slots from actual group standings.
+  // 3rd-place slots stay 'TBD' until the feed provides actual team names.
   const q=GK.map(g=>{
     const a=actualGroups[g];
-    if(!a) return['TBD','TBD','TBD'];
-    return[a[0]||'TBD',a[1]||'TBD',a[2]||'TBD'];
+    if(!a) return['TBD','TBD'];
+    return[a[0]||'TBD',a[1]||'TBD'];
   });
   const pairs=[
-    [q[0][0],q[1][1]],[q[1][0],q[0][1]],[q[2][0],q[3][1]],[q[3][0],q[2][1]],
-    [q[4][0],q[5][1]],[q[5][0],q[4][1]],[q[6][0],q[7][1]],[q[7][0],q[6][1]],
-    [q[8][0],q[9][1]],[q[9][0],q[8][1]],[q[10][0],q[11][1]],[q[11][0],q[10][1]],
-    [q[0][2],q[3][2]],[q[1][2],q[2][2]],[q[4][2],q[7][2]],[q[5][2],q[6][2]]
+    [q[0][1], q[1][1]],   // 2A vs 2B
+    [q[4][0], 'TBD'],     // 1E vs 3A/B/C/D/F
+    [q[5][0], q[2][1]],   // 1F vs 2C
+    [q[2][0], q[5][1]],   // 1C vs 2F
+    [q[8][0], 'TBD'],     // 1I vs 3C/D/F/G/H
+    [q[4][1], q[8][1]],   // 2E vs 2I
+    [q[0][0], 'TBD'],     // 1A vs 3C/E/F/H/I
+    [q[11][0],'TBD'],     // 1L vs 3E/H/I/J/K
+    [q[3][0], 'TBD'],     // 1D vs 3B/E/F/I/J
+    [q[6][0], 'TBD'],     // 1G vs 3A/E/H/I/J
+    [q[10][1],q[11][1]],  // 2K vs 2L
+    [q[7][0], q[9][1]],   // 1H vs 2J
+    [q[1][0], 'TBD'],     // 1B vs 3E/F/G/I/J
+    [q[9][0], q[7][1]],   // 1J vs 2H
+    [q[10][0],'TBD'],     // 1K vs 3D/E/I/J/L
+    [q[3][1], q[6][1]],   // 2D vs 2G
   ];
-  pairs.forEach((p,i)=>{koMatches.r32[i].teams=p;});
+  // Only write to slots that haven't been filled by feed data
+  pairs.forEach((p,i)=>{
+    if(koMatches.r32[i].teams[0]==='TBD'&&koMatches.r32[i].teams[1]==='TBD')
+      koMatches.r32[i].teams=p;
+  });
 }
 
 // ══════════════════════════════════════════════════════
 //  RENDER LEADERBOARD
 // ══════════════════════════════════════════════════════
 function renderLeaderboard(){
-  const ranked=[...PLAYERS].sort((a,b)=>totalPoints(b)-totalPoints(a));
+  const ranked=[...PLAYERS].sort((a,b)=>{
+    const d=totalPoints(b)-totalPoints(a);
+    return d!==0?d:tiebreak(a,b);
+  });
   const grid=document.getElementById('lbGrid');
 
   const rankClass=['rank-1','rank-2','rank-3'];
@@ -1314,6 +1422,7 @@ function setPrediction(player, g, newPosStr, teamName){
   savePredictions();
   renderGroupTable();
   renderMobileGroups();
+  renderKnockout();
   renderLeaderboard();
 }
 
@@ -1328,7 +1437,8 @@ function getActualMatchTeams(round, matchIdx){
   if(round==='r32') return koMatches.r32[matchIdx].teams;
   if(round==='final') return [getActualWinner('sf',0)||'TBD',getActualWinner('sf',1)||'TBD'];
   const prev={r16:'r32',qf:'r16',sf:'qf'}[round];
-  return [getActualWinner(prev,matchIdx*2)||'TBD',getActualWinner(prev,matchIdx*2+1)||'TBD'];
+  const [a,b]=KO_SEEDS[round][matchIdx];
+  return [getActualWinner(prev,a)||'TBD',getActualWinner(prev,b)||'TBD'];
 }
 
 function getPlayerWinner(player, round, idx){
@@ -1339,23 +1449,40 @@ function getPlayerWinner(player, round, idx){
 
 function getPlayerMatchTeams(player, round, matchIdx){
   if(round==='r32'){
+    // If feed has resolved actual teams for this match, use those
+    const actual=koMatches.r32[matchIdx].teams;
+    if(actual[0]!=='TBD'||actual[1]!=='TBD') return actual;
+    // Otherwise derive from player's group predictions / actual group results
     const q=GK.map(g=>{
       const a=actualGroups[g];
-      if(a) return[a[0]||'TBD',a[1]||'TBD',a[2]||'TBD'];
+      if(a) return[a[0]||'TBD',a[1]||'TBD'];
       const pred=predictions[player][g];
-      return[pred[0]||'TBD',pred[1]||'TBD',pred[2]||'TBD'];
+      return[pred[0]||'TBD',pred[1]||'TBD'];
     });
     const pairs=[
-      [q[0][0],q[1][1]],[q[1][0],q[0][1]],[q[2][0],q[3][1]],[q[3][0],q[2][1]],
-      [q[4][0],q[5][1]],[q[5][0],q[4][1]],[q[6][0],q[7][1]],[q[7][0],q[6][1]],
-      [q[8][0],q[9][1]],[q[9][0],q[8][1]],[q[10][0],q[11][1]],[q[11][0],q[10][1]],
-      [q[0][2],q[3][2]],[q[1][2],q[2][2]],[q[4][2],q[7][2]],[q[5][2],q[6][2]]
+      [q[0][1], q[1][1]],   // 2A vs 2B
+      [q[4][0], 'TBD'],     // 1E vs 3A/B/C/D/F
+      [q[5][0], q[2][1]],   // 1F vs 2C
+      [q[2][0], q[5][1]],   // 1C vs 2F
+      [q[8][0], 'TBD'],     // 1I vs 3C/D/F/G/H
+      [q[4][1], q[8][1]],   // 2E vs 2I
+      [q[0][0], 'TBD'],     // 1A vs 3C/E/F/H/I
+      [q[11][0],'TBD'],     // 1L vs 3E/H/I/J/K
+      [q[3][0], 'TBD'],     // 1D vs 3B/E/F/I/J
+      [q[6][0], 'TBD'],     // 1G vs 3A/E/H/I/J
+      [q[10][1],q[11][1]],  // 2K vs 2L
+      [q[7][0], q[9][1]],   // 1H vs 2J
+      [q[1][0], 'TBD'],     // 1B vs 3E/F/G/I/J
+      [q[9][0], q[7][1]],   // 1J vs 2H
+      [q[10][0],'TBD'],     // 1K vs 3D/E/I/J/L
+      [q[3][1], q[6][1]],   // 2D vs 2G
     ];
     return pairs[matchIdx];
   }
   if(round==='final') return [getPlayerWinner(player,'sf',0)||'TBD',getPlayerWinner(player,'sf',1)||'TBD'];
   const prev={r16:'r32',qf:'r16',sf:'qf'}[round];
-  return [getPlayerWinner(player,prev,matchIdx*2)||'TBD',getPlayerWinner(player,prev,matchIdx*2+1)||'TBD'];
+  const [a,b]=KO_SEEDS[round][matchIdx];
+  return [getPlayerWinner(player,prev,a)||'TBD',getPlayerWinner(player,prev,b)||'TBD'];
 }
 
 function clearInvalidDownstreamPicks(player, changedRound, changedIdx){
@@ -1364,7 +1491,8 @@ function clearInvalidDownstreamPicks(player, changedRound, changedIdx){
   let affectedIdx=changedIdx;
   for(let ri=start+1;ri<progression.length;ri++){
     const round=progression[ri];
-    affectedIdx=round==='final'?0:Math.floor(affectedIdx/2);
+    const prevRound=progression[ri-1];
+    affectedIdx=round==='final'?0:KO_NEXT[prevRound][affectedIdx];
     const currentPick=round==='final'?koPredictions[player].final:(koPredictions[player][round]||{})[affectedIdx];
     if(!currentPick) break;
     const teams=getPlayerMatchTeams(player,round,affectedIdx);
@@ -1376,11 +1504,133 @@ function clearInvalidDownstreamPicks(player, changedRound, changedIdx){
 }
 
 // ══════════════════════════════════════════════════════
+//  BRACKET VISUALIZATION
+// ══════════════════════════════════════════════════════
+function renderBracket(){
+  const UNIT=62, CARD_H=46, CARD_W=155, GAP=20;
+  const totalH=16*UNIT, totalW=(CARD_W+GAP)*4+CARD_W;
+
+  // Visual ordering of match indices top-to-bottom for each round
+  // R32: which match index appears at each visual slot 0–15
+  const R32_VIS=[1,4,0,2,10,11,8,9,3,5,6,7,13,15,12,14];
+  // R16: which match index appears at each visual slot 0–7
+  const R16_VIS=[0,1,4,5,2,3,6,7];
+
+  // Center-Y for a given round and visual index
+  const cy=(round,vi)=>{
+    if(round==='r32')   return (vi+0.5)*UNIT;
+    if(round==='r16')   return (vi*2+1)*UNIT;
+    if(round==='qf')    return (vi*4+2)*UNIT;
+    if(round==='sf')    return (vi*8+4)*UNIT;
+    return 8*UNIT;
+  };
+  // Left-X of each round column
+  const cx=round=>({r32:0,r16:1,qf:2,sf:3,final:4}[round])*(CARD_W+GAP);
+
+  const locked=isLocked();
+
+  const renderCard=(round,matchIdx,visIdx)=>{
+    const teams=getPlayerMatchTeams(currentPlayer,round,matchIdx);
+    const pick=round==='final'?koPredictions[currentPlayer].final:(koPredictions[currentPlayer][round]||{})[matchIdx];
+    const actual=round==='final'?actualKO.final:(actualKO[round]?.[matchIdx]);
+    const top=cy(round,visIdx)-CARD_H/2;
+    const left=cx(round);
+    let h=`<div class="bk-card" style="top:${top}px;left:${left}px;width:${CARD_W}px">`;
+    [0,1].forEach(i=>{
+      const t=teams[i]||'TBD';
+      const isPick=!actual&&t!=='TBD'&&pick===t;
+      const isWin =actual&&actual===t;
+      const isLose=actual&&actual!==t&&t!=='TBD';
+      const canClick=!locked&&t!=='TBD'&&!actual;
+      const cls=`bk-team${isPick?' bk-pick':''}${isWin?' bk-winner':''}${isLose?' bk-loser':''}`;
+      const idxArg=round==='final'?0:matchIdx;
+      let inner;
+      if(t!=='TBD'){
+        inner=`${flagCircle(t,13)}<span class="bk-tname">${t}</span>`;
+      } else if(round==='r32'&&i===1&&R32_THIRD_GROUPS[matchIdx]){
+        const grps=R32_THIRD_GROUPS[matchIdx];
+        const cands=grps.map(g=>actualGroups[g]?.[2]??predictions[currentPlayer]?.[g]?.[2]).filter(Boolean);
+        const candFlags=cands.map(c=>{
+          const isSel=!actual&&pick===c;
+          const canPickC=!locked&&!actual;
+          const ring=isSel?';box-shadow:0 0 0 2px #0064ff':'';
+          const oc=canPickC?`onclick="toggleKOPick('${esc(currentPlayer)}','r32',${matchIdx},'${esc(c)}')" title="Click to pick / deselect"`:'';
+          return `<span ${oc} style="display:inline-block;border-radius:50%;${canPickC?'cursor:pointer;':''}${ring}">${flagCircle(c,12)}</span>`;
+        }).join('');
+        const flagRow=cands.length
+          ?`<span style="display:inline-flex;gap:3px;flex-shrink:0;align-items:center">${candFlags}</span>`
+          :`<span class="bk-tbd-dot"></span>`;
+        inner=`${flagRow}<span class="bk-tname" style="color:#555;font-size:9px">3rd ${grps.join('/')}</span>`;
+      } else {
+        inner=`<span class="bk-tbd-dot"></span><span class="bk-tname" style="color:#444">TBD</span>`;
+      }
+      h+=`<div class="${cls}"${canClick?` onclick="toggleKOPick('${esc(currentPlayer)}','${round}',${idxArg},'${esc(t)}')" title="Click to pick / deselect"`:''}>${inner}</div>`;
+      if(i===0) h+=`<div class="bk-sep"></div>`;
+    });
+    return h+'</div>';
+  };
+
+  // SVG bracket connector lines
+  const svgLines=[];
+  const addArm=(x1,x2,ya,yb,ym)=>{
+    const xm=x1+GAP/2;
+    svgLines.push(
+      `<line x1="${x1}" y1="${ya}" x2="${xm}" y2="${ya}"/>`,
+      `<line x1="${x1}" y1="${yb}" x2="${xm}" y2="${yb}"/>`,
+      `<line x1="${xm}" y1="${ya}" x2="${xm}" y2="${yb}"/>`,
+      `<line x1="${xm}" y1="${ym}" x2="${x2}" y2="${ym}"/>`
+    );
+  };
+
+  // R32 → R16
+  for(let v=0;v<8;v++){
+    addArm(cx('r32')+CARD_W, cx('r16'), cy('r32',v*2), cy('r32',v*2+1), cy('r16',v));
+  }
+  // R16 → QF
+  for(let v=0;v<4;v++){
+    addArm(cx('r16')+CARD_W, cx('qf'), cy('r16',v*2), cy('r16',v*2+1), cy('qf',v));
+  }
+  // QF → SF
+  for(let v=0;v<2;v++){
+    addArm(cx('qf')+CARD_W, cx('sf'), cy('qf',v*2), cy('qf',v*2+1), cy('sf',v));
+  }
+  // SF → Final
+  addArm(cx('sf')+CARD_W, cx('final'), cy('sf',0), cy('sf',1), cy('final',0));
+
+  // Build all match cards
+  let cards='';
+  R32_VIS.forEach((mi,vi)=>{ cards+=renderCard('r32',mi,vi); });
+  R16_VIS.forEach((mi,vi)=>{ cards+=renderCard('r16',mi,vi); });
+  [0,1,2,3].forEach(mi=>{ cards+=renderCard('qf',mi,mi); });
+  [0,1].forEach(mi=>{ cards+=renderCard('sf',mi,mi); });
+  cards+=renderCard('final',0,0);
+
+  // Round column headers
+  const rndLabels=['Round of 32','Round of 16','Quarters','Semis','Final'];
+  const rndKeys=['r32','r16','qf','sf','final'];
+  const hdrs=rndKeys.map((r,i)=>
+    `<div class="bk-hdr-cell" style="width:${CARD_W}px;margin-right:${i<4?GAP:0}px">${rndLabels[i]}</div>`
+  ).join('');
+
+  return `<div class="bk-outer">
+    <div class="bk-scroll">
+      <div class="bk-hdr" style="width:${totalW}px;margin-bottom:10px">${hdrs}</div>
+      <div style="position:relative;width:${totalW}px;height:${totalH}px">
+        <svg style="position:absolute;top:0;left:0;width:${totalW}px;height:${totalH}px;pointer-events:none" fill="none">
+          <g stroke="#262626" stroke-width="1.5">${svgLines.join('')}</g>
+        </svg>
+        ${cards}
+      </div>
+    </div>
+  </div>`;
+}
+
+// ══════════════════════════════════════════════════════
 //  RENDER KNOCKOUT
 // ══════════════════════════════════════════════════════
 function renderKnockout(){
   const el=document.getElementById('koContent');
-  let html='';
+  let html=renderBracket();
 
   const rounds=[...KO_ROUNDS,'final'];
   rounds.forEach(round=>{
@@ -1396,8 +1646,16 @@ function renderKnockout(){
     matches.forEach((m,idx)=>{
       const actual=round==='final'?actualKO.final:actualKO[round][idx];
       const labelTeams=getActualMatchTeams(round,idx);
-      const matchLabel=labelTeams[0]==='TBD'?`Match ${idx+1}`
-        :`<span style="display:inline-flex;align-items:center;gap:4px">${flagCircle(labelTeams[0],14)} ${labelTeams[0]} <span style="color:#444">vs</span> ${flagCircle(labelTeams[1],14)} ${labelTeams[1]}</span>`;
+      const renderSide=(name,matchIdx,rnd)=>{
+        if(name!=='TBD') return `<span style="display:inline-flex;align-items:center;gap:3px">${flagCircle(name,14)} ${name}</span>`;
+        if(rnd!=='r32') return `<span style="color:#555;font-size:10px">TBD</span>`;
+        const grps=R32_THIRD_GROUPS[matchIdx]||[];
+        const known=grps.map(g=>actualGroups[g]?.[2]).filter(Boolean);
+        const flags=known.map(t=>flagCircle(t,13)).join('');
+        return `<span style="display:inline-flex;align-items:center;gap:3px">${flags}<span style="color:#555;font-size:10px;white-space:nowrap">3rd ${grps.join('/')}</span></span>`;
+      };
+      const matchLabel=(labelTeams[0]==='TBD'&&labelTeams[1]==='TBD')?`Match ${idx+1}`
+        :`<span style="display:inline-flex;align-items:center;gap:5px;flex-wrap:wrap">${renderSide(labelTeams[0],idx,round)}<span style="color:#444">vs</span>${renderSide(labelTeams[1],idx,round)}</span>`;
       html+=`<tr><td class="left" style="font-size:11px">${matchLabel}</td>`;
       html+=`<td class="result">${actual?`<span style="display:inline-flex;align-items:center;gap:5px">${flagCircle(actual,16)} ${actual}</span>`:'—'}</td>`;
       PLAYERS.forEach(p=>{
@@ -1405,18 +1663,9 @@ function renderKnockout(){
         const correct=actual&&ppred===actual;
         const cls=actual?(correct?'pred-15':'pred-0'):'pred-p';
         const ptsTxt=actual?(correct?pts:0):'?';
-        const playerTeams=getPlayerMatchTeams(p,round,idx);
-        const available=playerTeams.filter(t=>t!=='TBD');
-        const isMe=p===currentPlayer;
-        const locked=isLocked();
-        const sel=available.length>0
-          ?((isMe&&!locked)
-            ?`<select onchange="setKOPick('${esc(p)}','${round}',${idx},this.value)" style="background:#1a1a1a;border:1px solid #333;color:#fff;font-size:11px;padding:2px 4px;border-radius:3px">`
-              +`<option value="" ${!ppred?'selected':''}>--</option>`
-              +available.map(t=>`<option value="${t}" ${ppred===t?'selected':''}>${t}</option>`).join('')
-              +'</select>'
-            :(ppred?flagCircle(ppred,16):'—'))
-          :((isMe&&!locked)?'<span style="color:#555;font-size:10px">pick prev. round first</span>':'—');
+        const sel=ppred
+          ?`<span style="display:inline-flex;align-items:center;gap:4px">${flagCircle(ppred,15)} ${ppred}</span>`
+          :`<span style="color:#3a3a3a">—</span>`;
         html+=`<td data-me="${p===currentPlayer}" class="${cls}" style="font-size:11px">${sel}</td>`
           +`<td data-me="${p===currentPlayer}" class="${cls}" style="font-weight:700;font-size:11px">${ptsTxt}</td>`;
       });
@@ -1441,6 +1690,11 @@ function renderKnockout(){
   html+='</tr></tbody></table></div>';
 
   el.innerHTML=html;
+}
+
+function toggleKOPick(player, round, idx, team){
+  const cur=round==='final'?koPredictions[player].final:(koPredictions[player][round]||{})[idx];
+  setKOPick(player, round, idx, cur===team?'':team);
 }
 
 function setKOPick(player, round, idx, team){
@@ -1479,7 +1733,10 @@ function renderFixtures(){
   else if(filter!=='all')  matches=matches.filter(m=>m.group===filter);
 
   if(!matches.length){
-    tbody.innerHTML='<tr><td colspan="6" style="padding:1.5rem;color:#555;text-align:center">No fixtures loaded yet — check back after June 11</td></tr>';
+    const msg=allFixtures.length===0
+      ?'No fixtures loaded yet — check back after June 11'
+      :'No matches found for this filter';
+    tbody.innerHTML=`<tr><td colspan="6" style="padding:1.5rem;color:#555;text-align:center">${msg}</td></tr>`;
     return;
   }
 
