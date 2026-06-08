@@ -308,6 +308,25 @@ select:focus { border-color: var(--blue); }
 .mg-btn:active { background:#2a2a2a; color:#fff; }
 .mg-btn:disabled { opacity:0.2; cursor:default; }
 
+/* ── 3rd Place Qualifier Picks ── */
+#thirdPicksSection { margin-top: 28px; }
+.tp-header { display:flex; align-items:center; gap:12px; margin-bottom:14px; flex-wrap:wrap; }
+.tp-title { font-family:'Oswald',sans-serif; font-size:15px; font-weight:700; letter-spacing:.06em; color:#fff; text-transform:uppercase; }
+.tp-counter { font-size:12px; color:var(--text-dim); background:var(--card); border:1px solid var(--line); border-radius:4px; padding:3px 8px; }
+.tp-counter.full { color:#22c55e; border-color:#22c55e44; }
+.tp-sub { font-size:11px; color:var(--text-dim); width:100%; margin-top:-6px; }
+.tp-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:8px; }
+@media(max-width:600px){ .tp-grid { grid-template-columns:repeat(2,1fr); } }
+.tp-card { background:var(--card); border:1px solid var(--line); border-radius:6px; padding:10px 12px; cursor:pointer; display:flex; flex-direction:column; gap:4px; transition:border-color .15s,background .15s; user-select:none; }
+.tp-card:hover:not(.tp-locked) { border-color:#555; }
+.tp-card.selected { border-color:var(--blue); background:#0064ff18; }
+.tp-card.disabled { opacity:.4; cursor:default; }
+.tp-card.tp-locked { cursor:default; }
+.tp-group-label { font-size:10px; color:var(--text-dim); font-family:'Oswald',sans-serif; letter-spacing:.08em; }
+.tp-team { font-size:13px; color:#fff; display:flex; align-items:center; gap:5px; }
+.tp-check { width:14px; height:14px; border:1.5px solid #444; border-radius:3px; margin-left:auto; flex-shrink:0; display:flex; align-items:center; justify-content:center; font-size:9px; }
+.tp-card.selected .tp-check { background:var(--blue); border-color:var(--blue); color:#fff; }
+
 /* ── Prediction cell colours ── */
 .pred-15 { background: var(--c-15) !important; color: #4dffaa; }
 .pred-10 { background: var(--c-10) !important; color: #86e870; }
@@ -449,6 +468,7 @@ body.my-picks-only table.ss [data-me="false"] { display: none; }
     </div>
     <div class="mobile-groups" id="mobileGroupCards"></div>
     <div class="desktop-table-wrap"><div class="ss-wrap"><table class="ss" id="groupTable"></table></div></div>
+    <div id="thirdPicksSection"></div>
   </div>
 </div>
 
@@ -733,7 +753,7 @@ function buildPointsHistory(){
         const actual=snapG[g]; if(!actual) return;
         predictions[p][g].forEach((team,predPos)=>{
           const actPos=actual.indexOf(team); if(actPos===-1) return;
-          const pA=predPos<2,aA=actPos<2||(actPos===2&&thirdPlaceAdvancers.has(team)),pc=predPos===actPos;
+          const pA=predPos<2||(predPos===2&&thirdPicks[p].has(team)),aA=actPos<2||(actPos===2&&thirdPlaceAdvancers.has(team)),pc=predPos===actPos;
           if(pc&&aA)pts+=15; else if(pc)pts+=5; else if(pA&&aA)pts+=10;
         });
       });
@@ -883,10 +903,12 @@ GK.forEach(g=>{
 // ── PLAYER PREDICTIONS ──
 const predictions = {};
 const koPredictions = {};
+const thirdPicks = {};
 PLAYERS.forEach(p=>{
   predictions[p]={};
   GK.forEach(g=>{ predictions[p][g]=[...GROUPS[g].teams]; });
   koPredictions[p]={ r32:{}, r16:{}, qf:{}, sf:{}, final:null };
+  thirdPicks[p]=new Set();
 });
 
 // Knockout bracket structure
@@ -954,7 +976,7 @@ function calcGroupPoints(player, g){
   pred.forEach((team, predPos)=>{
     const actPos = actual.indexOf(team);
     if(actPos === -1) return;
-    const predAdvances = predPos < 2;
+    const predAdvances = predPos < 2 || (predPos === 2 && thirdPicks[player].has(team));
     const actAdvances  = actPos < 2 || (actPos === 2 && thirdPlaceAdvancers.has(team));
     const posCorrect   = predPos === actPos;
     if(posCorrect && actAdvances) pts += 15;
@@ -1052,6 +1074,7 @@ function submitNewProfile(){
   predictions[name]={};
   GK.forEach(g=>{ predictions[name][g]=[...GROUPS[g].teams]; });
   koPredictions[name]={ r32:{}, r16:{}, qf:{}, sf:{}, final:null };
+  thirdPicks[name]=new Set();
   selectPlayer(name);
   savePredictions();
 }
@@ -1096,7 +1119,8 @@ async function savePredictions(){
     const payload={
       player: currentPlayer,
       group_preds: predictions[currentPlayer],
-      ko_preds: koPredictions[currentPlayer]
+      ko_preds: koPredictions[currentPlayer],
+      third_picks: [...(thirdPicks[currentPlayer]||[])]
     };
     const {data, error}=await sb.from('predictions').upsert(payload,{onConflict:'player'}).select();
     if(error) throw error;
@@ -1123,12 +1147,15 @@ async function loadPredictions(){
         predictions[pl]={};
         GK.forEach(g=>{ predictions[pl][g]=[...GROUPS[g].teams]; });
         koPredictions[pl]={ r32:{}, r16:{}, qf:{}, sf:{}, final:null };
+        thirdPicks[pl]=new Set();
       }
       if(row.group_preds) GK.forEach(g=>{
         if(row.group_preds[g]&&row.group_preds[g].length===4)
           predictions[pl][g]=row.group_preds[g];
       });
       if(row.ko_preds) Object.assign(koPredictions[pl],row.ko_preds);
+      if(row.third_picks&&Array.isArray(row.third_picks))
+        thirdPicks[pl]=new Set(row.third_picks);
     });
   }catch(e){ console.error('Load failed:',e); }
 }
@@ -1386,7 +1413,7 @@ function predCellClass(player, g, predPos){
   const team=predictions[player][g][predPos];
   const actPos=actual.indexOf(team);
   const posCorrect=actPos===predPos;
-  const predAdv=predPos<2;
+  const predAdv=predPos<2||(predPos===2&&thirdPicks[player].has(team));
   const actAdv=actPos<2||(actPos===2&&thirdPlaceAdvancers.has(team));
   if(posCorrect&&actAdv) return 'pred-15';
   if(posCorrect)          return 'pred-5';
@@ -1399,7 +1426,7 @@ function predPts(player,g,predPos){
   const team=predictions[player][g][predPos];
   const actPos=actual.indexOf(team);
   const posCorrect=actPos===predPos;
-  const predAdv=predPos<2;
+  const predAdv=predPos<2||(predPos===2&&thirdPicks[player].has(team));
   const actAdv=actPos<2||(actPos===2&&thirdPlaceAdvancers.has(team));
   if(posCorrect&&actAdv) return '15';
   if(posCorrect)          return '5';
@@ -1497,6 +1524,7 @@ function setPrediction(player, g, newPosStr, teamName){
   savePredictions();
   renderGroupTable();
   renderMobileGroups();
+  renderThirdPicks();
   renderKnockout();
   renderLeaderboard();
 }
@@ -1957,11 +1985,51 @@ function showPage(id,btn){
   if(id==='knockout') setTimeout(fitBracket, 0);
 }
 
+function renderThirdPicks(){
+  const el=document.getElementById('thirdPicksSection');
+  if(!el) return;
+  if(!currentPlayer){ el.innerHTML=''; return; }
+  const picks=thirdPicks[currentPlayer]||new Set();
+  const count=picks.size;
+  const locked=isLocked();
+  const cards=GK.map(g=>{
+    const team=predictions[currentPlayer][g][2];
+    const selected=picks.has(team);
+    const canSelect=!locked&&(!selected&&count<8||selected);
+    const cls=['tp-card',selected?'selected':'',(!canSelect&&!selected)?'disabled':'',locked?'tp-locked':''].filter(Boolean).join(' ');
+    const onclick=locked?'':`onclick="toggleThirdPick('${esc(team)}')"`;
+    return `<div class="${cls}" ${onclick}>
+      <div class="tp-group-label">Group ${g} · 3rd place</div>
+      <div class="tp-team">${flag(team)} ${team}<span class="tp-check">${selected?'✓':''}</span></div>
+    </div>`;
+  }).join('');
+  el.innerHTML=`<div class="tp-header">
+    <span class="tp-title">3rd Place Qualifiers</span>
+    <span class="tp-counter${count===8?' full':''}">${count} / 8 selected</span>
+    ${!locked?`<span class="tp-sub">Pick the 8 third-place teams you think will advance to the Round of 32</span>`:''}
+  </div>
+  <div class="tp-grid">${cards}</div>`;
+}
+
+function toggleThirdPick(team){
+  if(!currentPlayer||isLocked()) return;
+  const picks=thirdPicks[currentPlayer];
+  if(picks.has(team)) picks.delete(team);
+  else if(picks.size<8) picks.add(team);
+  else return;
+  savePredictions();
+  renderThirdPicks();
+  renderGroupTable();
+  renderMobileGroups();
+  renderLeaderboard();
+}
+
 function renderAll(){
   renderLeaderboard();
   renderGroupTable();
   renderMobileGroups();
   renderKnockout();
+  renderThirdPicks();
 }
 
 // ══════════════════════════════════════════════════════
