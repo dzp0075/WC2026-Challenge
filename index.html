@@ -652,22 +652,32 @@ function flagCircle(name, size=18){
 // ══════════════════════════════════════════════════════
 //  PREDICTION LOCK
 // ══════════════════════════════════════════════════════
-const LOCK_DATE = new Date('2026-06-11T15:00:00Z');
-function isLocked(){ return new Date() >= LOCK_DATE; }
+const LOCK_DATE    = new Date('2026-06-11T15:00:00Z');
+const KO_LOCK_DATE = new Date('2026-06-28T15:00:00Z');
+function isLocked()  { return new Date() >= LOCK_DATE; }
+function isKOLocked(){ return new Date() >= KO_LOCK_DATE; }
 
 function updateLockBanner(){
   const el = document.getElementById('lockBanner');
   if(!el) return;
-  if(isLocked()){
-    el.textContent = '🔒  Predictions are locked — Tournament is underway';
+  if(isKOLocked()){
+    el.textContent = '🔒  All predictions are locked — Tournament is underway';
     el.className = 'lock-banner locked';
+    el.style.display = 'block';
+    return;
+  }
+  if(isLocked()){
+    const diff = KO_LOCK_DATE - new Date();
+    const days = Math.ceil(diff / 864e5);
+    el.textContent = `🔒  Group picks locked  ·  ⏳  Knockout picks lock in ${days} day${days!==1?'s':''} — June 28, 2026`;
+    el.className = 'lock-banner countdown';
     el.style.display = 'block';
     return;
   }
   const diff = LOCK_DATE - new Date();
   const days = Math.ceil(diff / 864e5);
   if(days <= 21){
-    el.textContent = `⏳  Predictions lock in ${days} day${days!==1?'s':''} — June 11, 2026`;
+    el.textContent = `⏳  Group & 3rd place picks lock in ${days} day${days!==1?'s':''} — June 11, 2026`;
     el.className = 'lock-banner countdown';
     el.style.display = 'block';
   } else {
@@ -1679,7 +1689,7 @@ function renderBracket(){
   const xFin=4*CW;
   const xR={sf:5*CW,qf:6*CW,r16:7*CW,r32:8*CW};
 
-  const locked=isLocked();
+  const locked=isKOLocked();
 
   const renderCard=(round,matchIdx,visIdx,xLeft)=>{
     const teams=getPlayerMatchTeams(currentPlayer,round,matchIdx);
@@ -1700,16 +1710,19 @@ function renderBracket(){
       const canClick=!locked&&t!=='TBD'&&!actual;
       const cls=`bk-team${isPick?' bk-pick':''}${isWin?' bk-winner':''}${isLose?' bk-loser':''}`;
       const idxArg=round==='final'?0:matchIdx;
+      const myThirdPicks=thirdPicks[currentPlayer]||new Set();
       let inner;
       if(t!=='TBD'){
-        inner=`${flagCircle(t,13)}<span class="bk-tname">${t}</span>`;
+        const qBadge=is3rdSlot&&myThirdPicks.has(t)?`<span style="font-size:8px;background:#0064ff33;color:#4d9fff;border-radius:2px;padding:0 3px;margin-left:3px;flex-shrink:0;line-height:1.6">Q</span>`:'';
+        inner=`${flagCircle(t,13)}<span class="bk-tname">${t}</span>${qBadge}`;
       } else if(is3rdSlot){
-        const candFlags=(cands3||[]).map(c=>{
+        const filtered=(cands3||[]).filter(c=>myThirdPicks.has(c));
+        const candFlags=filtered.map(c=>{
           const canPickC=!locked&&!actual;
           const oc=canPickC?`onclick="toggleKOPick('${esc(currentPlayer)}','r32',${matchIdx},'${esc(c)}')" title="Click to pick / deselect"`:'';
           return `<span ${oc} style="display:inline-block;border-radius:50%;${canPickC?'cursor:pointer;':''}flex-shrink:0">${flagCircle(c,12)}</span>`;
         }).join('');
-        const flagRow=(cands3||[]).length
+        const flagRow=filtered.length
           ?`<span style="display:inline-flex;gap:3px;flex-shrink:0;align-items:center">${candFlags}</span>`
           :`<span class="bk-tbd-dot"></span>`;
         inner=`${flagRow}<span class="bk-tname" style="color:#555;font-size:9px">3rd ${grps3.join('/')}</span>`;
@@ -1789,7 +1802,7 @@ function renderBracket(){
 // ══════════════════════════════════════════════════════
 function renderMobileKO(){
   if(!currentPlayer) return '';
-  const locked=isLocked();
+  const locked=isKOLocked();
   const roundDefs=[
     {key:'r32',  label:'Round of 32',    order:[1,4,0,2,10,11,8,9,3,5,6,7,13,15,12,14]},
     {key:'r16',  label:'Round of 16',    order:[0,1,4,5,2,3,6,7]},
@@ -1822,16 +1835,19 @@ function renderMobileKO(){
         const canClick=!locked&&t!=='TBD'&&!actual;
         const idxArg=round==='final'?0:matchIdx;
         const cls=`mob-ko-team bk-team${isPick?' bk-pick':''}${isWin?' bk-winner':''}${isLose?' bk-loser':''}`;
+        const myThirdPicks=thirdPicks[currentPlayer]||new Set();
         let inner;
         if(t!=='TBD'){
-          inner=`${flagCircle(t,14)}<span class="bk-tname">${t}</span>`;
+          const qBadge=is3rdSlot&&myThirdPicks.has(t)?`<span style="font-size:8px;background:#0064ff33;color:#4d9fff;border-radius:2px;padding:0 3px;margin-left:3px;flex-shrink:0;line-height:1.6">Q</span>`:'';
+          inner=`${flagCircle(t,14)}<span class="bk-tname">${t}</span>${qBadge}`;
         } else if(is3rdSlot){
-          const candFlags=(cands3||[]).map(c=>{
+          const filtered=(cands3||[]).filter(c=>myThirdPicks.has(c));
+          const candFlags=filtered.map(c=>{
             const canPickC=!locked&&!actual;
             const oc=canPickC?`onclick="toggleKOPick('${esc(currentPlayer)}','r32',${matchIdx},'${esc(c)}')" title="Pick / deselect"`:'';
             return `<span ${oc} style="display:inline-block;border-radius:50%;${canPickC?'cursor:pointer;':''}flex-shrink:0">${flagCircle(c,13)}</span>`;
           }).join('');
-          const flagRow=(cands3||[]).length
+          const flagRow=filtered.length
             ?`<span style="display:inline-flex;gap:3px;align-items:center">${candFlags}</span>`
             :`<span class="bk-tbd-dot"></span>`;
           inner=`${flagRow}<span class="bk-tname" style="color:#555;font-size:10px">3rd ${grps3.join('/')}</span>`;
@@ -1923,7 +1939,7 @@ function toggleKOPick(player, round, idx, team){
 }
 
 function setKOPick(player, round, idx, team){
-  if(player!==currentPlayer) return;
+  if(player!==currentPlayer||isKOLocked()) return;
   const pick=team||null;
   if(round==='final') koPredictions[player].final=pick;
   else{
@@ -2067,6 +2083,7 @@ function toggleThirdPick(team){
   renderThirdPicks();
   renderGroupTable();
   renderMobileGroups();
+  renderKnockout();
   renderLeaderboard();
 }
 
