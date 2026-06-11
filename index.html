@@ -334,6 +334,10 @@ select:focus { border-color: var(--blue); }
 .pred-0  { background: var(--c-0)  !important; color: #ff5f5f; }
 .pred-p  { background: var(--c-pending) !important; color: var(--text-dim); }
 
+/* ── Fixture status cell ── */
+.fx-live     { background: var(--c-5) !important; color: #f5c842; }
+.fx-finished { background: var(--c-0) !important; color: #ff5f5f; }
+
 /* ── My Picks ── */
 body.my-picks-only table.ss [data-me="false"] { display: none; }
 
@@ -500,11 +504,11 @@ body.my-picks-only table.ss [data-me="false"] { display: none; }
     </div>
     <div class="ss-wrap"><table class="ss" id="fixturesTable">
       <thead><tr>
-        <th class="left">Date</th><th class="left mob-hide">Round / Group</th>
+        <th class="left">Date</th><th class="left mob-hide">Time (ET)</th><th class="left mob-hide">Round / Group</th>
         <th class="left">Home</th><th>Score</th><th class="left">Away</th>
         <th class="left mob-hide">Venue</th>
       </tr></thead>
-      <tbody id="fixtureRows"><tr><td colspan="6" style="padding:1.5rem;color:#555;text-align:center">Loading fixtures…</td></tr></tbody>
+      <tbody id="fixtureRows"><tr><td colspan="7" style="padding:1.5rem;color:#555;text-align:center">Loading fixtures…</td></tr></tbody>
     </table></div>
   </div>
 </div>
@@ -1977,7 +1981,7 @@ function renderFixtures(){
     const msg=allFixtures.length===0
       ?'No fixtures loaded yet — check back after June 11'
       :'No matches found for this filter';
-    tbody.innerHTML=`<tr><td colspan="6" style="padding:1.5rem;color:#555;text-align:center">${msg}</td></tr>`;
+    tbody.innerHTML=`<tr><td colspan="7" style="padding:1.5rem;color:#555;text-align:center">${msg}</td></tr>`;
     return;
   }
 
@@ -1987,17 +1991,44 @@ function renderFixtures(){
     return d.toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric',timeZone:'UTC'});
   };
 
+  // Parse "HH:MM UTC±N" kickoff times into a UTC Date
+  const kickoffUTC=(dateStr,timeStr)=>{
+    if(!dateStr||!timeStr) return null;
+    const m2=timeStr.match(/^(\d{1,2}):(\d{2})\s*UTC([+-]\d+)$/);
+    if(!m2) return null;
+    const [,hh,mm,off]=m2;
+    const [y,mo,da]=dateStr.split('-').map(Number);
+    return new Date(Date.UTC(y,mo-1,da,Number(hh)-Number(off),Number(mm)));
+  };
+
+  // Convert "HH:MM UTC±N" kickoff times to US Eastern time
+  const fmtTime=(dateStr,timeStr)=>{
+    const utc=kickoffUTC(dateStr,timeStr);
+    if(!utc) return timeStr||'—';
+    return utc.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit',timeZone:'America/New_York',timeZoneName:'short'});
+  };
+
   tbody.innerHTML=matches.map(m=>{
     const hasScore=m.score&&m.score.ft&&typeof m.score.ft[0]==='number';
-    const score=hasScore?`<strong>${m.score.ft[0]}–${m.score.ft[1]}</strong>`:'<span style="color:#555">vs</span>';
+    const kickoff=kickoffUTC(m.date,m.time);
+    const started=kickoff&&new Date()>=kickoff;
+    // Group stage matches have no extra time/penalties, so treat as final 2hrs after kickoff
+    // even if worldcup.json hasn't been updated with the score yet
+    const TWO_HOURS=2*60*60*1000;
+    const timedOut=m.group&&kickoff&&(new Date()-kickoff)>=TWO_HOURS;
+    const isOver=hasScore||timedOut;
+    const isLive=!isOver&&started;
+    const score=hasScore?`<strong>${m.score.ft[0]}–${m.score.ft[1]}</strong>`:isLive?'<strong>LIVE</strong>':timedOut?'<strong>FT</strong>':'<span style="color:#555">vs</span>';
+    const scoreClass=isOver?'fx-finished':(isLive?'fx-live':'');
     const roundLabel=m.group||m.round||'—';
     const venue=m.ground||'—';
-    const rowStyle=hasScore?'':'opacity:0.75';
+    const rowStyle=(isOver||isLive)?'':'opacity:0.75';
     return `<tr style="${rowStyle}">
       <td class="left" style="white-space:nowrap;color:#555">${fmt(m.date)}</td>
+      <td class="left mob-hide" style="white-space:nowrap;font-size:11px;color:#555">${fmtTime(m.date,m.time)}</td>
       <td class="left mob-hide" style="font-size:11px;color:#555">${roundLabel}</td>
       <td class="left" style="white-space:nowrap">${flagCircle(ofbMap(m.team1),16)} ${ofbMap(m.team1)}</td>
-      <td style="font-size:13px;min-width:50px">${score}</td>
+      <td class="${scoreClass}" style="font-size:13px;min-width:50px">${score}</td>
       <td class="left" style="white-space:nowrap">${flagCircle(ofbMap(m.team2),16)} ${ofbMap(m.team2)}</td>
       <td class="left mob-hide" style="font-size:11px;color:#555">${venue}</td>
     </tr>`;
