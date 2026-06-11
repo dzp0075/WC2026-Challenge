@@ -338,6 +338,26 @@ select:focus { border-color: var(--blue); }
 .fx-live     { background: var(--c-5) !important; color: #f5c842; }
 .fx-finished { background: var(--c-0) !important; color: #ff5f5f; }
 
+/* ── Compare picks ── */
+.cmp-controls { display:flex; align-items:center; gap:10px; margin-bottom:1.25rem; flex-wrap:wrap; }
+.cmp-controls select { background:#1a1a1a; border:1px solid #333; color:#fff; font-size:13px; padding:6px 10px; border-radius:4px; }
+.cmp-vs { font-family:'Oswald',sans-serif; font-weight:700; letter-spacing:.1em; font-size:11px; color:#555; text-transform:uppercase; }
+.cmp-summary { display:flex; gap:10px; flex-wrap:wrap; margin-bottom:1.25rem; }
+.cmp-summary .lb-card { flex:1; min-width:150px; }
+.cmp-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(260px,1fr)); gap:10px; }
+.cmp-card { background:var(--card); border:1px solid var(--line); border-radius:6px; padding:10px 12px; }
+.cmp-card-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:6px; }
+.cmp-card-header span:first-child { font-family:'Oswald',sans-serif; font-weight:700; letter-spacing:.06em; }
+.cmp-names { display:grid; grid-template-columns:20px 1fr 1fr; gap:6px; font-size:10px; color:#555; text-transform:uppercase; letter-spacing:.06em; padding-bottom:4px; }
+.cmp-names span:not(:first-child) { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.cmp-row { display:grid; grid-template-columns:20px 1fr 1fr; gap:6px; align-items:center; padding:4px 0; border-top:1px solid var(--line); font-size:12px; }
+.cmp-row:first-of-type { border-top:none; }
+.cmp-pos { color:#555; font-size:11px; text-align:center; }
+.cmp-pick { display:flex; align-items:center; gap:5px; padding:3px 5px; border-radius:4px; min-width:0; }
+.cmp-pick span.t { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.cmp-pick.agree { box-shadow: inset 0 0 0 1px var(--accent); }
+.cmp-pts { margin-left:auto; font-size:10px; opacity:.75; flex-shrink:0; }
+
 /* ── My Picks ── */
 body.my-picks-only table.ss [data-me="false"] { display: none; }
 
@@ -439,6 +459,7 @@ body.my-picks-only table.ss [data-me="false"] { display: none; }
 <nav class="site-nav">
   <button class="nav-btn active" onclick="showPage('leaderboard',this)">Leaderboard</button>
   <button class="nav-btn" onclick="showPage('groups',this)">Group Stage</button>
+  <button class="nav-btn" onclick="showPage('compare',this)">Compare</button>
   <button class="nav-btn" onclick="showPage('knockout',this)">Knockout</button>
   <button class="nav-btn" onclick="showPage('fixtures',this)">Fixtures</button>
   <button class="nav-btn" onclick="showPage('rules',this)">Scoring Rules</button>
@@ -473,6 +494,21 @@ body.my-picks-only table.ss [data-me="false"] { display: none; }
     <div class="mobile-groups" id="mobileGroupCards"></div>
     <div class="desktop-table-wrap"><div class="ss-wrap"><table class="ss" id="groupTable"></table></div></div>
     <div id="thirdPicksSection"></div>
+  </div>
+</div>
+
+<!-- ══ COMPARE ══ -->
+<div id="compare" class="page">
+  <div class="page-inner">
+    <div class="section-title">Compare Picks</div>
+    <div class="section-sub">Compare two players' group stage predictions side by side</div>
+    <div class="cmp-controls">
+      <select id="compareA" onchange="renderCompare()"></select>
+      <span class="cmp-vs">vs</span>
+      <select id="compareB" onchange="renderCompare()"></select>
+    </div>
+    <div id="compareSummary"></div>
+    <div class="cmp-grid" id="compareContent"></div>
   </div>
 </div>
 
@@ -1587,6 +1623,7 @@ function setPrediction(player, g, newPosStr, teamName){
   renderThirdPicks();
   renderKnockout();
   renderLeaderboard();
+  renderCompare();
 }
 
 // ══════════════════════════════════════════════════════
@@ -2124,6 +2161,63 @@ function renderAll(){
   renderMobileGroups();
   renderKnockout();
   renderThirdPicks();
+  renderCompare();
+}
+
+// ══════════════════════════════════════════════════════
+//  COMPARE PICKS
+// ══════════════════════════════════════════════════════
+function renderCompare(){
+  const elA=document.getElementById('compareA');
+  const elB=document.getElementById('compareB');
+  const summaryEl=document.getElementById('compareSummary');
+  const content=document.getElementById('compareContent');
+  if(!elA||!elB||!content) return;
+
+  if(!elA.options.length){
+    PLAYERS.forEach(p=>{
+      elA.add(new Option(p,p));
+      elB.add(new Option(p,p));
+    });
+    elA.value = currentPlayer || PLAYERS[0];
+    elB.value = PLAYERS.find(p=>p!==elA.value) || PLAYERS[1];
+  }
+
+  const pA=elA.value, pB=elB.value;
+  let matches=0, total=0, html='';
+
+  GK.forEach(g=>{
+    const actual=actualGroups[g];
+    const predA=predictions[pA][g], predB=predictions[pB][g];
+    let rows='';
+    for(let pos=0;pos<4;pos++){
+      const teamA=predA[pos], teamB=predB[pos];
+      const agree=teamA===teamB;
+      total++; if(agree) matches++;
+      const clsA=actual?predCellClass(pA,g,pos):'';
+      const clsB=actual?predCellClass(pB,g,pos):'';
+      const ptsA=actual?predPts(pA,g,pos):'';
+      const ptsB=actual?predPts(pB,g,pos):'';
+      rows+=`<div class="cmp-row">
+        <div class="cmp-pos">${pos+1}</div>
+        <div class="cmp-pick ${clsA}${agree?' agree':''}">${flagCircle(teamA,18)}<span class="t">${teamA}</span>${actual?`<span class="cmp-pts">${ptsA}</span>`:''}</div>
+        <div class="cmp-pick ${clsB}${agree?' agree':''}">${flagCircle(teamB,18)}<span class="t">${teamB}</span>${actual?`<span class="cmp-pts">${ptsB}</span>`:''}</div>
+      </div>`;
+    }
+    html+=`<div class="cmp-card">
+      <div class="cmp-card-header"><span>Group ${g}</span>${actual?'<span style="font-size:10px;color:#404040;letter-spacing:.06em">FINAL</span>':''}</div>
+      <div class="cmp-names"><span></span><span>${esc(pA)}</span><span>${esc(pB)}</span></div>
+      ${rows}
+    </div>`;
+  });
+  content.innerHTML=html;
+
+  const ptsA=groupPts(pA), ptsB=groupPts(pB);
+  summaryEl.innerHTML=`<div class="cmp-summary">
+    <div class="lb-card"><div style="font-size:10px;color:#555;text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px">${esc(pA)}</div><div style="font-family:'Oswald',sans-serif;font-size:24px;font-weight:700;color:#fff">${ptsA} <span style="font-size:12px;color:#555">pts</span></div></div>
+    <div class="lb-card"><div style="font-size:10px;color:#555;text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px">${esc(pB)}</div><div style="font-family:'Oswald',sans-serif;font-size:24px;font-weight:700;color:#fff">${ptsB} <span style="font-size:12px;color:#555">pts</span></div></div>
+    <div class="lb-card"><div style="font-size:10px;color:#555;text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px">Matching Picks</div><div style="font-family:'Oswald',sans-serif;font-size:24px;font-weight:700;color:#fff">${matches} <span style="font-size:12px;color:#555">/ ${total}</span></div></div>
+  </div>`;
 }
 
 // ══════════════════════════════════════════════════════
