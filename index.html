@@ -801,7 +801,7 @@ function buildPointsHistory(){
         snapG[g]=st.sort((a,b)=>b.pts-a.pts||b.gd-a.gd||b.gf-a.gf).map(t=>t.name);
     });
 
-    labels.push(new Date(date).toLocaleDateString('en-GB',{day:'numeric',month:'short'}));
+    labels.push(new Date(date).toLocaleDateString('en-GB',{day:'numeric',month:'short',timeZone:'UTC'}));
 
     PLAYERS.forEach(p=>{
       let pts=0;
@@ -1984,7 +1984,7 @@ function renderFixtures(){
   const fmt=dateStr=>{
     if(!dateStr) return '—';
     const d=new Date(dateStr);
-    return d.toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'});
+    return d.toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric',timeZone:'UTC'});
   };
 
   tbody.innerHTML=matches.map(m=>{
