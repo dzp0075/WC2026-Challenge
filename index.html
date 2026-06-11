@@ -677,7 +677,7 @@ function updateLockBanner(){
   const diff = LOCK_DATE - new Date();
   const days = Math.ceil(diff / 864e5);
   if(days <= 21){
-    el.textContent = `⏳  Group & 3rd place picks lock in ${days} day${days!==1?'s':''} — June 11, 2026`;
+    el.textContent = `⏳  Group & 3rd place picks lock in ${days} day${days!==1?'s':''} — June 12, 2026`;
     el.className = 'lock-banner countdown';
     el.style.display = 'block';
   } else {
