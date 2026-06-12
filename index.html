@@ -406,6 +406,9 @@ body.my-picks-only table.ss [data-me="false"] { display: none; }
 .bk-locked .bk-team:not(.bk-winner):not(.bk-pick):not(.bk-loser) { opacity:0.5; }
 .bk-locked .bk-pick { opacity:0.75; }
 .bk-lock-notice { font-size:11px; color:#ff7070; letter-spacing:.04em; padding:6px 0 2px; text-align:center; }
+.proj-bracket-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(210px,1fr)); gap:10px; }
+.proj-bracket-grid .bk-card { position:relative; width:auto; }
+.proj-match-num { font-size:10px; color:var(--text-dim); font-family:'Oswald',sans-serif; letter-spacing:.1em; padding:4px 7px; border-bottom:1px solid #1e1e1e; }
 .desktop-bracket { display:block; overflow:hidden; }
 .mob-ko { display:none; }
 .mob-ko-section { margin-bottom:14px; }
@@ -461,6 +464,7 @@ body.my-picks-only table.ss [data-me="false"] { display: none; }
   <button class="nav-btn" onclick="showPage('groups',this)">Group Stage</button>
   <button class="nav-btn" onclick="showPage('compare',this)">Compare</button>
   <button class="nav-btn" onclick="showPage('knockout',this)">Knockout</button>
+  <button class="nav-btn" onclick="showPage('projections',this)">Projections</button>
   <button class="nav-btn" onclick="showPage('fixtures',this)">Fixtures</button>
   <button class="nav-btn" onclick="showPage('rules',this)">Scoring Rules</button>
 </nav>
@@ -518,6 +522,20 @@ body.my-picks-only table.ss [data-me="false"] { display: none; }
     <div class="section-title">Knockout Stage</div>
     <div class="section-sub">R32: 20 pts &nbsp;·&nbsp; R16: 30 pts &nbsp;·&nbsp; QF: 30 pts &nbsp;·&nbsp; SF: 40 pts &nbsp;·&nbsp; Final: 50 pts per correct winner</div>
     <div id="koContent"></div>
+  </div>
+</div>
+
+<!-- ══ PROJECTIONS ══ -->
+<div id="projections" class="page">
+  <div class="page-inner">
+    <div class="section-title">Group Stage Projections</div>
+    <div class="section-sub">A live snapshot — recalculates automatically as results come in. Shows the 3rd-place wildcard race and the Round of 32 draw if the group stage ended right now.</div>
+
+    <div class="ko-round-title">3rd Place Table</div>
+    <div class="ss-wrap"><table class="ss" id="thirdPlaceTable"></table></div>
+
+    <div class="ko-round-title" style="margin-top:1.5rem">Projected Round of 32</div>
+    <div class="proj-bracket-grid" id="projBracketGrid"></div>
   </div>
 </div>
 
@@ -1092,6 +1110,61 @@ function standingsFromScores(g, scores){
   return st.sort((a,b)=>b.pts-a.pts||b.gd-a.gd||b.gf-a.gf||a.i-b.i).map(t=>t.name);
 }
 function liveStandings(g){ return standingsFromScores(g, groupScores[g]); }
+
+// Full table (P/W/D/L/GF/GA/GD/Pts) for a group, sorted with the same
+// tiebreakers as standingsFromScores.
+function computeGroupStats(g){
+  const tms=GROUPS[g].teams;
+  const stats=tms.map((n,i)=>({name:n,i,p:0,w:0,d:0,l:0,gf:0,ga:0,gd:0,pts:0}));
+  groupScores[g].forEach(m=>{
+    const h=parseInt(m.sh),a=parseInt(m.sa);
+    if(isNaN(h)||isNaN(a)) return;
+    stats[m.h].p++;stats[m.a].p++;
+    stats[m.h].gf+=h;stats[m.h].ga+=a;stats[m.h].gd+=h-a;
+    stats[m.a].gf+=a;stats[m.a].ga+=h;stats[m.a].gd+=a-h;
+    if(h>a){stats[m.h].w++;stats[m.h].pts+=3;stats[m.a].l++;}
+    else if(h<a){stats[m.a].w++;stats[m.a].pts+=3;stats[m.h].l++;}
+    else{stats[m.h].d++;stats[m.h].pts++;stats[m.a].d++;stats[m.a].pts++;}
+  });
+  return stats.sort((a,b)=>b.pts-a.pts||b.gd-a.gd||b.gf-a.gf||a.i-b.i);
+}
+
+// Current 3rd-place team in each group, ranked head-to-head as the wildcard
+// race would be resolved if the group stage ended right now.
+function computeThirdPlaceTable(){
+  const rows=GK.map(g=>({group:g, ...computeGroupStats(g)[2]}));
+  const ranked=[...rows].sort((a,b)=>b.pts-a.pts||b.gd-a.gd||b.gf-a.gf);
+  const advancing=new Set(ranked.slice(0,8).map(r=>r.group));
+  rows.forEach(r=>{ r.advancing=advancing.has(r.group); });
+  return rows;
+}
+
+// Projected R32 matchups (1st/2nd from live standings, 3rd-place wildcard
+// slots left as null) if the group stage ended right now.
+function buildProjectedR32Pairs(){
+  const q=GK.map(g=>{
+    const order=liveStandings(g)||GROUPS[g].teams;
+    return [order[0],order[1]];
+  });
+  return [
+    [q[0][1], q[1][1]],   // 2A vs 2B
+    [q[4][0], null],      // 1E vs 3A/B/C/D/F
+    [q[5][0], q[2][1]],   // 1F vs 2C
+    [q[2][0], q[5][1]],   // 1C vs 2F
+    [q[8][0], null],      // 1I vs 3C/D/F/G/H
+    [q[4][1], q[8][1]],   // 2E vs 2I
+    [q[0][0], null],      // 1A vs 3C/E/F/H/I
+    [q[11][0],null],      // 1L vs 3E/H/I/J/K
+    [q[3][0], null],      // 1D vs 3B/E/F/I/J
+    [q[6][0], null],      // 1G vs 3A/E/H/I/J
+    [q[10][1],q[11][1]],  // 2K vs 2L
+    [q[7][0], q[9][1]],   // 1H vs 2J
+    [q[1][0], null],      // 1B vs 3E/F/G/I/J
+    [q[9][0], q[7][1]],   // 1J vs 2H
+    [q[10][0],null],      // 1K vs 3D/E/I/J/L
+    [q[3][1], q[6][1]],   // 2D vs 2G
+  ];
+}
 
 // Live outcome (15/10/5/0) for one predicted slot, or null if the group hasn't kicked off yet.
 // A team currently sitting 3rd is treated as NOT advancing until all groups are final
@@ -2184,6 +2257,69 @@ function renderAll(){
   renderKnockout();
   renderThirdPicks();
   renderCompare();
+  renderProjections();
+}
+
+// ══════════════════════════════════════════════════════
+//  GROUP STAGE PROJECTIONS
+// ══════════════════════════════════════════════════════
+function renderThirdPlaceTable(){
+  const tbl=document.getElementById('thirdPlaceTable');
+  if(!tbl) return;
+  const ranked=[...computeThirdPlaceTable()].sort((a,b)=>b.pts-a.pts||b.gd-a.gd||b.gf-a.gf);
+  let html='<thead><tr><th>Rank</th><th class="left">Group</th><th class="left">Team</th>'
+    +'<th class="mob-hide">P</th><th class="mob-hide">W</th><th class="mob-hide">D</th><th class="mob-hide">L</th>'
+    +'<th class="mob-hide">GF</th><th class="mob-hide">GA</th><th>GD</th><th>Pts</th><th>Status</th></tr></thead><tbody>';
+  ranked.forEach((r,i)=>{
+    const cutoff=i===7?'border-bottom:2px solid var(--accent)':'';
+    const badge=r.advancing
+      ?`<span class="score-badge s15" style="font-size:10px">Advancing</span>`
+      :`<span class="score-badge s0" style="font-size:10px">Eliminated</span>`;
+    html+=`<tr>`
+      +`<td style="${cutoff}">${i+1}</td>`
+      +`<td class="left" style="${cutoff};font-weight:700">${r.group}</td>`
+      +`<td class="left team-name" style="${cutoff}">${flag(r.name)} ${r.name}</td>`
+      +`<td class="mob-hide" style="${cutoff}">${r.p}</td><td class="mob-hide" style="${cutoff}">${r.w}</td>`
+      +`<td class="mob-hide" style="${cutoff}">${r.d}</td><td class="mob-hide" style="${cutoff}">${r.l}</td>`
+      +`<td class="mob-hide" style="${cutoff}">${r.gf}</td><td class="mob-hide" style="${cutoff}">${r.ga}</td>`
+      +`<td style="${cutoff}">${r.gd>0?'+':''}${r.gd}</td><td class="pts-cell" style="${cutoff}">${r.pts}</td>`
+      +`<td style="${cutoff}">${badge}</td></tr>`;
+  });
+  html+='</tbody>';
+  tbl.innerHTML=html;
+}
+
+function renderProjectedBracket(){
+  const grid=document.getElementById('projBracketGrid');
+  if(!grid) return;
+  const pairs=buildProjectedR32Pairs();
+  const advancingThirds=computeThirdPlaceTable().filter(r=>r.advancing);
+
+  const renderSide=(team, matchIdx)=>{
+    if(team!==null) return `<div class="bk-team">${flagCircle(team,15)}<span class="bk-tname">${team}</span></div>`;
+    const grps=R32_THIRD_GROUPS[matchIdx]||[];
+    const cands=advancingThirds.filter(r=>grps.includes(r.group));
+    const flagsHtml=cands.length
+      ?`<span style="display:inline-flex;gap:3px;flex-shrink:0">${cands.map(c=>flagCircle(c.name,13)).join('')}</span>`
+      :`<span class="bk-tbd-dot"></span>`;
+    return `<div class="bk-team">${flagsHtml}<span class="bk-tname" style="color:#555;font-size:10px">3rd ${grps.join('/')}</span></div>`;
+  };
+
+  grid.innerHTML=pairs.map((p,i)=>{
+    const venue=KO_VENUES.r32[i];
+    return `<div class="bk-card">`
+      +`<div class="proj-match-num">Match ${i+1}</div>`
+      +renderSide(p[0],i)
+      +`<div class="bk-sep"></div>`
+      +renderSide(p[1],i)
+      +(venue?`<div class="bk-venue">${venue}</div>`:'')
+      +`</div>`;
+  }).join('');
+}
+
+function renderProjections(){
+  renderThirdPlaceTable();
+  renderProjectedBracket();
 }
 
 // ══════════════════════════════════════════════════════
