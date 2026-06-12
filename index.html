@@ -886,8 +886,15 @@ function renderChart(){
   if(!container||!canvas) return;
 
   let hist = buildPointsHistory();
-  const isDemo = !hist || hist.labels.length < 2;
-  if(isDemo) hist = buildDemoHistory();
+  if(!hist){
+    hist = buildDemoHistory();
+  } else if(hist.labels.length < 2){
+    // Only one date of results so far — prepend the all-zero starting point
+    // so the chart still draws a line rather than discarding the real data.
+    const demo = buildDemoHistory();
+    hist.labels = demo.labels.concat(hist.labels);
+    PLAYERS.forEach(p=>{ hist.series[p] = demo.series[p].concat(hist.series[p]); });
+  }
 
   container.style.display='block';
 
