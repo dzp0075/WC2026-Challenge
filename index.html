@@ -735,8 +735,14 @@ function renderMobileGroups(){
   GK.forEach(g=>{
     const actual = actualGroups[g];
     const pred = currentPlayer ? predictions[currentPlayer][g] : null;
-    const displayOrder = actual || pred || [...GROUPS[g].teams];
-    const gpts = (currentPlayer && actual) ? calcGroupPoints(currentPlayer, g) : null;
+    const live = liveStandings(g);
+    const started = !!live;
+    // Once picks are locked, show rows sorted by live/final standings (points/GD) instead
+    // of the player's predicted order. Before lock, keep predicted order so the ▲▼
+    // reorder buttons stay aligned with the rows they move.
+    const standingsOrder = actual || (isLocked() ? live : null);
+    const displayOrder = standingsOrder || pred || [...GROUPS[g].teams];
+    const gpts = (currentPlayer && started) ? calcGroupPoints(currentPlayer, g) : null;
     html += `<div class="mg-card">
       <div class="mg-header">
         <span>Group ${g}</span>
@@ -748,9 +754,9 @@ function renderMobileGroups(){
     const canEdit = !actual && !!currentPlayer && !isLocked();
     displayOrder.forEach((teamName, pos)=>{
       const predPos = pred ? pred.indexOf(teamName) : pos;
-      const cls = actual ? predCellClass(currentPlayer, g, predPos) : '';
-      const pts = actual ? predPts(currentPlayer, g, predPos) : '';
-      const adv = actual && (pos < 2 || (pos === 2 && thirdPlaceAdvancers.has(teamName)));
+      const cls = currentPlayer ? predCellClass(currentPlayer, g, predPos) : '';
+      const pts = currentPlayer ? predPts(currentPlayer, g, predPos) : '';
+      const adv = standingsOrder && (pos < 2 || (pos === 2 && (thirdPlaceAdvancers.size?thirdPlaceAdvancers.has(teamName):false)));
       let ptsBadgeStyle = '';
       let ptsColor = '';
       if(cls==='pred-15'){ ptsBadgeStyle='background:var(--c-15)'; ptsColor='color:#4dffaa'; }
@@ -766,7 +772,7 @@ function renderMobileGroups(){
       html += `<div class="mg-row">
         <div class="mg-pos ${adv?'adv':''}">${flagCircle(teamName, 24)}</div>
         <div class="mg-name">${teamName}</div>
-        ${actual
+        ${pts!==''
           ? `<div class="mg-pts-badge" style="${ptsBadgeStyle};${ptsColor}">${pts} pts</div>`
           : ''
         }
@@ -826,30 +832,29 @@ function buildPointsHistory(){
       }
     });
 
-    // Derive group standings snapshot
+    // Derive live group standings as of this date (null if group hasn't kicked off yet)
     const snapG = {};
-    GK.forEach(g=>{
-      const tms=GROUPS[g].teams;
-      const st=tms.map(n=>({name:n,pts:0,gd:0,gf:0}));
-      cumG[g].forEach(m=>{
-        const h=parseInt(m.sh),a=parseInt(m.sa);
-        if(isNaN(h)||isNaN(a)) return;
-        st[m.h].gf+=h;st[m.h].gd+=h-a;st[m.a].gf+=a;st[m.a].gd+=a-h;
-        if(h>a)st[m.h].pts+=3; else if(h<a)st[m.a].pts+=3; else{st[m.h].pts++;st[m.a].pts++;}
-      });
-      if(cumG[g].filter(m=>m.sh!=='').length===6)
-        snapG[g]=st.sort((a,b)=>b.pts-a.pts||b.gd-a.gd||b.gf-a.gf).map(t=>t.name);
-    });
+    GK.forEach(g=>{ snapG[g] = standingsFromScores(g, cumG[g]); });
+    // Wildcard race is only resolved once every group has played all 6 matches.
+    // Since results never change once a group is final, the global thirdPlaceAdvancers
+    // already reflects the correct (frozen) wildcard set for any such date.
+    const groupStageDoneByDate = GK.every(g=>cumG[g].filter(m=>m.sh!=='').length===6);
+    const thirdAdvByDate = groupStageDoneByDate ? thirdPlaceAdvancers : null;
 
     labels.push(new Date(date).toLocaleDateString('en-GB',{day:'numeric',month:'short',timeZone:'UTC'}));
 
     PLAYERS.forEach(p=>{
       let pts=0;
       GK.forEach(g=>{
-        const actual=snapG[g]; if(!actual) return;
+        const standings=snapG[g]; if(!standings) return;
         predictions[p][g].forEach((team,predPos)=>{
-          const actPos=actual.indexOf(team); if(actPos===-1) return;
-          const pA=predPos<2||(predPos===2&&thirdPicks[p].has(team)),aA=actPos<2||(actPos===2&&thirdPlaceAdvancers.has(team)),pc=predPos===actPos;
+          const actPos=standings.indexOf(team); if(actPos===-1) return;
+          const pA=predPos<2||(predPos===2&&thirdPicks[p].has(team));
+          let aA;
+          if(actPos<2) aA=true;
+          else if(actPos===3) aA=false;
+          else aA = thirdAdvByDate ? thirdAdvByDate.has(team) : false;
+          const pc=predPos===actPos;
           if(pc&&aA)pts+=15; else if(pc)pts+=5; else if(pA&&aA)pts+=10;
         });
       });
@@ -1064,21 +1069,46 @@ const koMatches = {
 // ══════════════════════════════════════════════════════
 //  SCORING ENGINE
 // ══════════════════════════════════════════════════════
-function calcGroupPoints(player, g){
-  const actual = actualGroups[g];
-  if(!actual) return 0;
-  const pred = predictions[player][g];
-  let pts = 0;
-  pred.forEach((team, predPos)=>{
-    const actPos = actual.indexOf(team);
-    if(actPos === -1) return;
-    const predAdvances = predPos < 2 || (predPos === 2 && thirdPicks[player].has(team));
-    const actAdvances  = actPos < 2 || (actPos === 2 && thirdPlaceAdvancers.has(team));
-    const posCorrect   = predPos === actPos;
-    if(posCorrect && actAdvances) pts += 15;
-    else if(posCorrect)           pts += 5;
-    else if(predAdvances && actAdvances) pts += 10;
+// Build live standings (pts/gd/gf, original-index tiebreak) from a group's match scores.
+// Returns null if no matches in the group have been played yet.
+function standingsFromScores(g, scores){
+  if(!scores.some(m=>m.sh!=='')) return null;
+  const tms=GROUPS[g].teams;
+  const st=tms.map((n,i)=>({name:n,i,pts:0,gd:0,gf:0}));
+  scores.forEach(m=>{
+    const h=parseInt(m.sh),a=parseInt(m.sa);
+    if(isNaN(h)||isNaN(a)) return;
+    st[m.h].gf+=h; st[m.h].gd+=h-a;
+    st[m.a].gf+=a; st[m.a].gd+=a-h;
+    if(h>a) st[m.h].pts+=3; else if(h<a) st[m.a].pts+=3; else { st[m.h].pts++; st[m.a].pts++; }
   });
+  return st.sort((a,b)=>b.pts-a.pts||b.gd-a.gd||b.gf-a.gf||a.i-b.i).map(t=>t.name);
+}
+function liveStandings(g){ return standingsFromScores(g, groupScores[g]); }
+
+// Live outcome (15/10/5/0) for one predicted slot, or null if the group hasn't kicked off yet.
+// A team currently sitting 3rd is treated as NOT advancing until all groups are final
+// and the wildcard race (thirdPlaceAdvancers) is resolved.
+function predOutcome(player, g, predPos){
+  const standings = liveStandings(g);
+  if(!standings) return null;
+  const team = predictions[player][g][predPos];
+  const actPos = standings.indexOf(team);
+  const predAdvances = predPos < 2 || (predPos === 2 && thirdPicks[player].has(team));
+  let actAdvances;
+  if(actPos < 2) actAdvances = true;
+  else if(actPos === 3) actAdvances = false;
+  else actAdvances = thirdPlaceAdvancers.size ? thirdPlaceAdvancers.has(team) : false;
+  const posCorrect = predPos === actPos;
+  if(posCorrect && actAdvances) return 15;
+  if(posCorrect)                return 5;
+  if(predAdvances && actAdvances) return 10;
+  return 0;
+}
+
+function calcGroupPoints(player, g){
+  let pts = 0;
+  for(let predPos=0; predPos<4; predPos++) pts += predOutcome(player, g, predPos) || 0;
   return pts;
 }
 
@@ -1504,30 +1534,12 @@ function ordinal(n){
 //  RENDER GROUP STAGE TABLE
 // ══════════════════════════════════════════════════════
 function predCellClass(player, g, predPos){
-  const actual=actualGroups[g];
-  if(!actual) return 'pred-p';
-  const team=predictions[player][g][predPos];
-  const actPos=actual.indexOf(team);
-  const posCorrect=actPos===predPos;
-  const predAdv=predPos<2||(predPos===2&&thirdPicks[player].has(team));
-  const actAdv=actPos<2||(actPos===2&&thirdPlaceAdvancers.has(team));
-  if(posCorrect&&actAdv) return 'pred-15';
-  if(posCorrect)          return 'pred-5';
-  if(predAdv&&actAdv)     return 'pred-10';
-  return 'pred-0';
+  const r=predOutcome(player,g,predPos);
+  return r===null ? 'pred-p' : 'pred-'+r;
 }
 function predPts(player,g,predPos){
-  const actual=actualGroups[g];
-  if(!actual) return '';
-  const team=predictions[player][g][predPos];
-  const actPos=actual.indexOf(team);
-  const posCorrect=actPos===predPos;
-  const predAdv=predPos<2||(predPos===2&&thirdPicks[player].has(team));
-  const actAdv=actPos<2||(actPos===2&&thirdPlaceAdvancers.has(team));
-  if(posCorrect&&actAdv) return '15';
-  if(posCorrect)          return '5';
-  if(predAdv&&actAdv)     return '10';
-  return '0';
+  const r=predOutcome(player,g,predPos);
+  return r===null ? '' : String(r);
 }
 
 function renderGroupTable(){
@@ -1560,10 +1572,13 @@ function renderGroupTable(){
     });
     html+='</tr>';
 
-    const displayOrder=actual||[...tms];
+    const live=liveStandings(g);
+    const standingsKnown=!!(actual||live);
+    const displayOrder=actual||live||[...tms];
     displayOrder.forEach((teamName,pos)=>{
       const st=stats.find(s=>s.name===teamName)||{w:0,d:0,l:0,gd:0,pts:0};
-      const rowStyle=actual&&(pos<2||(pos===2&&thirdPlaceAdvancers.has(teamName)))?'border-left:3px solid #0064ff':'';
+      const advances=pos<2||(pos===2&&(thirdPlaceAdvancers.size?thirdPlaceAdvancers.has(teamName):false));
+      const rowStyle=standingsKnown&&advances?'border-left:3px solid #0064ff':'';
       html+=`<tr><td style="width:22px;text-align:center;padding:4px;font-size:16px">${flag(teamName)}</td>`
         +`<td class="team-name" style="${rowStyle}">${teamName}</td>`
         +`<td class="mob-hide">${st.w}</td><td class="mob-hide">${st.d}</td><td class="mob-hide">${st.l}</td>`
