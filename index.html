@@ -842,8 +842,12 @@ function buildPointsHistory(){
         if(!grp||!tms) return;
         const hi=tms.indexOf(hn), ai=tms.indexOf(an);
         if(hi===-1||ai===-1) return;
-        const mi=grp.findIndex(x=>x.h===hi&&x.a===ai);
+        let mi=grp.findIndex(x=>x.h===hi&&x.a===ai);
         if(mi!==-1){grp[mi].sh=hs;grp[mi].sa=as_;}
+        else{
+          mi=grp.findIndex(x=>x.h===ai&&x.a===hi);
+          if(mi!==-1){grp[mi].sh=as_;grp[mi].sa=hs;}
+        }
       } else if(m.round){
         const round=KO_ROUND_MAP[m.round]; if(!round) return;
         const w=koWinner(m,hn,an);
@@ -1499,9 +1503,15 @@ async function fetchResults(){
         if(!tms) return;
         const hi=tms.indexOf(hn), ai=tms.indexOf(an);
         if(hi===-1||ai===-1) return;
-        const mi=grp.findIndex(x=>x.h===hi&&x.a===ai);
-        if(mi===-1) return;
-        grp[mi].sh=hs; grp[mi].sa=as_; matchCount++;
+        let mi=grp.findIndex(x=>x.h===hi&&x.a===ai);
+        if(mi!==-1){
+          grp[mi].sh=hs; grp[mi].sa=as_;
+        }else{
+          mi=grp.findIndex(x=>x.h===ai&&x.a===hi);
+          if(mi===-1) return;
+          grp[mi].sh=as_; grp[mi].sa=hs;
+        }
+        matchCount++;
       } else if(m.round){
         const round=KO_ROUND_MAP[m.round]; if(!round) return;
         const fi=round!=='final'?koFixtureCount[round]:0;
