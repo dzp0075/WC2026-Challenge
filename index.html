@@ -469,6 +469,7 @@ body.my-picks-only table.ss [data-me="false"] { display: none; }
   <button class="nav-btn" onclick="showPage('projections',this)">Projections</button>
   <button class="nav-btn" onclick="showPage('fixtures',this)">Fixtures</button>
   <button class="nav-btn" onclick="showPage('rules',this)">Scoring Rules</button>
+  <button id="adminNavBtn" class="nav-btn" onclick="showPage('admin',this)" style="display:none">Admin</button>
 </nav>
 
 <!-- ══ LEADERBOARD ══ -->
@@ -672,6 +673,15 @@ body.my-picks-only table.ss [data-me="false"] { display: none; }
         <li>Most Exact Group Stage Predictions</li>
       </ol>
     </div>
+  </div>
+</div>
+
+<!-- ══ ADMIN ══ -->
+<div id="admin" class="page">
+  <div class="page-inner">
+    <div class="section-title">Admin</div>
+    <div class="section-sub">Manually correct bracket matchups or set results if the feed data is wrong</div>
+    <div id="adminContent"></div>
   </div>
 </div>
 
@@ -1022,6 +1032,15 @@ function dn(name){return name==='TBD'?'TBD':flag(name)+' '+name;}
 const actualGroups = {};
 const thirdPlaceAdvancers = new Set();
 const actualKO = { r32:{}, r16:{}, qf:{}, sf:{}, final:null };
+
+// ── BRACKET OVERRIDES (manual admin corrections, persisted to localStorage) ──
+const bracketOverrides = JSON.parse(localStorage.getItem('wc2026_bracket_overrides')||'{}');
+function applyBracketOverrides(){
+  Object.entries(bracketOverrides).forEach(([key,teams])=>{
+    const m=key.match(/^r32-(\d+)$/);
+    if(m) koMatches.r32[parseInt(m[1])].teams=[...teams];
+  });
+}
 
 // ── GROUP STAGE RESULTS ──
 const groupScores = {};
@@ -1383,6 +1402,8 @@ function setMyPicksOnly(on){
 function updatePlayerDisplay(){
   const el=document.getElementById('currentPlayerDisplay');
   if(el) el.textContent=currentPlayer?'Playing as '+currentPlayer:'';
+  const adminBtn=document.getElementById('adminNavBtn');
+  if(adminBtn) adminBtn.style.display=currentPlayer==='Dev'?'':'none';
 }
 
 // ══════════════════════════════════════════════════════
@@ -1568,6 +1589,7 @@ async function fetchResults(){
     }
 
     updateKOBracket();
+    applyBracketOverrides();
     // Clear any player KO picks that are now invalid based on confirmed R32 teams
     let currentPlayerPicksCleared=false;
     PLAYERS.forEach(player=>{
@@ -1576,9 +1598,6 @@ async function fetchResults(){
         if(!pick) continue;
         const teams=getPlayerMatchTeams(player,'r32',i);
         if(!teams.includes(pick)){
-          // 3rd-place slot picks are predictions and must never be auto-cleared —
-          // a wrong pick simply scores 0.
-          if(R32_THIRD_GROUPS[i]) continue;
           if(!koPredictions[player].r32) koPredictions[player].r32={};
           koPredictions[player].r32[i]=null;
           clearInvalidDownstreamPicks(player,'r32',i);
@@ -1600,8 +1619,6 @@ async function fetchResults(){
 }
 
 function updateKOBracket(){
-  // Only fills known 1st/2nd-place slots from actual group standings.
-  // 3rd-place slots stay 'TBD' until the feed provides actual team names.
   const q=GK.map(g=>{
     const a=actualGroups[g];
     if(!a) return['TBD','TBD'];
@@ -1609,23 +1626,36 @@ function updateKOBracket(){
   });
   const pairs=[
     [q[0][1], q[1][1]],   // 2A vs 2B
-    [q[4][0], 'TBD'],     // 1E vs 3A/B/C/D/F
+    [q[4][0], 'TBD'],     // 1E vs 3rd
     [q[5][0], q[2][1]],   // 1F vs 2C
     [q[2][0], q[5][1]],   // 1C vs 2F
-    [q[8][0], 'TBD'],     // 1I vs 3C/D/F/G/H
+    [q[8][0], 'TBD'],     // 1I vs 3rd
     [q[4][1], q[8][1]],   // 2E vs 2I
-    [q[0][0], 'TBD'],     // 1A vs 3C/E/F/H/I
-    [q[11][0],'TBD'],     // 1L vs 3E/H/I/J/K
-    [q[3][0], 'TBD'],     // 1D vs 3B/E/F/I/J
-    [q[6][0], 'TBD'],     // 1G vs 3A/E/H/I/J
+    [q[0][0], 'TBD'],     // 1A vs 3rd
+    [q[11][0],'TBD'],     // 1L vs 3rd
+    [q[3][0], 'TBD'],     // 1D vs 3rd
+    [q[6][0], 'TBD'],     // 1G vs 3rd
     [q[10][1],q[11][1]],  // 2K vs 2L
     [q[7][0], q[9][1]],   // 1H vs 2J
-    [q[1][0], 'TBD'],     // 1B vs 3E/F/G/I/J
+    [q[1][0], 'TBD'],     // 1B vs 3rd
     [q[9][0], q[7][1]],   // 1J vs 2H
-    [q[10][0],'TBD'],     // 1K vs 3D/E/I/J/L
+    [q[10][0],'TBD'],     // 1K vs 3rd
     [q[3][1], q[6][1]],   // 2D vs 2G
   ];
-  // Only write to slots that haven't been filled by feed data
+
+  // Once all 12 groups are final, use Annex C to assign actual 3rd-place teams
+  if(thirdPlaceAdvancers.size===8){
+    const advancingGroups=GK.filter(g=>actualGroups[g]&&thirdPlaceAdvancers.has(actualGroups[g][2]));
+    const teamByGroup={};
+    advancingGroups.forEach(g=>{ teamByGroup[g]=actualGroups[g][2]; });
+    const slotGroups=annexCSlotGroups(advancingGroups);
+    Object.entries(slotGroups).forEach(([idxStr,grp])=>{
+      const i=parseInt(idxStr);
+      if(pairs[i]&&pairs[i][1]==='TBD') pairs[i][1]=teamByGroup[grp]||'TBD';
+    });
+  }
+
+  // Feed data takes precedence — only write slots that haven't been resolved by the feed
   pairs.forEach((p,i)=>{
     if(koMatches.r32[i].teams[0]==='TBD'&&koMatches.r32[i].teams[1]==='TBD')
       koMatches.r32[i].teams=p;
@@ -1818,37 +1848,7 @@ function getPlayerWinner(player, round, idx){
 }
 
 function getPlayerMatchTeams(player, round, matchIdx){
-  if(round==='r32'){
-    // If feed has resolved actual teams for this match, use those
-    const actual=koMatches.r32[matchIdx].teams;
-    if(actual[0]!=='TBD'||actual[1]!=='TBD') return actual;
-    // Otherwise derive from player's group predictions / actual group results
-    const q=GK.map(g=>{
-      const a=actualGroups[g];
-      if(a) return[a[0]||'TBD',a[1]||'TBD'];
-      const pred=predictions[player][g];
-      return[pred[0]||'TBD',pred[1]||'TBD'];
-    });
-    const pairs=[
-      [q[0][1], q[1][1]],   // 2A vs 2B
-      [q[4][0], 'TBD'],     // 1E vs 3A/B/C/D/F
-      [q[5][0], q[2][1]],   // 1F vs 2C
-      [q[2][0], q[5][1]],   // 1C vs 2F
-      [q[8][0], 'TBD'],     // 1I vs 3C/D/F/G/H
-      [q[4][1], q[8][1]],   // 2E vs 2I
-      [q[0][0], 'TBD'],     // 1A vs 3C/E/F/H/I
-      [q[11][0],'TBD'],     // 1L vs 3E/H/I/J/K
-      [q[3][0], 'TBD'],     // 1D vs 3B/E/F/I/J
-      [q[6][0], 'TBD'],     // 1G vs 3A/E/H/I/J
-      [q[10][1],q[11][1]],  // 2K vs 2L
-      [q[7][0], q[9][1]],   // 1H vs 2J
-      [q[1][0], 'TBD'],     // 1B vs 3E/F/G/I/J
-      [q[9][0], q[7][1]],   // 1J vs 2H
-      [q[10][0],'TBD'],     // 1K vs 3D/E/I/J/L
-      [q[3][1], q[6][1]],   // 2D vs 2G
-    ];
-    return pairs[matchIdx];
-  }
+  if(round==='r32') return koMatches.r32[matchIdx].teams;
   if(round==='final') return [getPlayerWinner(player,'sf',0)||'TBD',getPlayerWinner(player,'sf',1)||'TBD'];
   const prev={r16:'r32',qf:'r16',sf:'qf'}[round];
   const [a,b]=KO_SEEDS[round][matchIdx];
@@ -1909,37 +1909,16 @@ function renderBracket(){
     const top=cy(round,visIdx)-CARD_H/2;
     let h=`<div class="bk-card" style="top:${top}px;left:${xLeft}px;width:${CARD_W}px">`;
     [0,1].forEach(i=>{
-      const rawT=teams[i]||'TBD';
-      const is3rdSlot=round==='r32'&&i===1&&!!R32_THIRD_GROUPS[matchIdx];
-      const grps3=is3rdSlot?R32_THIRD_GROUPS[matchIdx]:null;
-      const cands3=grps3?grps3.map(g=>actualGroups[g]?.[2]??predictions[currentPlayer]?.[g]?.[2]).filter(Boolean):null;
-      const pickIs3rd=is3rdSlot&&rawT==='TBD'&&!!pick&&pick!==teams[0];
-      const t=pickIs3rd?pick:rawT;
+      const t=teams[i]||'TBD';
       const isPick=!actual&&t!=='TBD'&&pick===t;
       const isWin=actual&&actual===t;
       const isLose=actual&&actual!==t&&t!=='TBD';
       const canClick=!locked&&t!=='TBD'&&!actual;
       const cls=`bk-team${isPick?' bk-pick':''}${isWin?' bk-winner':''}${isLose?' bk-loser':''}`;
       const idxArg=round==='final'?0:matchIdx;
-      const myThirdPicks=thirdPicks[currentPlayer]||new Set();
-      let inner;
-      if(t!=='TBD'){
-        const qBadge=is3rdSlot&&myThirdPicks.has(t)?`<span style="font-size:8px;background:#0064ff33;color:#4d9fff;border-radius:2px;padding:0 3px;margin-left:3px;flex-shrink:0;line-height:1.6">Q</span>`:'';
-        inner=`${flagCircle(t,13)}<span class="bk-tname">${t}</span>${qBadge}`;
-      } else if(is3rdSlot){
-        const filtered=(cands3||[]).filter(c=>myThirdPicks.has(c));
-        const candFlags=filtered.map(c=>{
-          const canPickC=!locked&&!actual;
-          const oc=canPickC?`onclick="toggleKOPick('${esc(currentPlayer)}','r32',${matchIdx},'${esc(c)}')" title="Click to pick / deselect"`:'';
-          return `<span ${oc} style="display:inline-block;border-radius:50%;${canPickC?'cursor:pointer;':''}flex-shrink:0">${flagCircle(c,12)}</span>`;
-        }).join('');
-        const flagRow=filtered.length
-          ?`<span style="display:inline-flex;gap:3px;flex-shrink:0;align-items:center">${candFlags}</span>`
-          :`<span class="bk-tbd-dot"></span>`;
-        inner=`${flagRow}<span class="bk-tname" style="color:#555;font-size:9px">3rd ${grps3.join('/')}</span>`;
-      } else {
-        inner=`<span class="bk-tbd-dot"></span><span class="bk-tname" style="color:#444">TBD</span>`;
-      }
+      const inner=t!=='TBD'
+        ?`${flagCircle(t,13)}<span class="bk-tname">${t}</span>`
+        :`<span class="bk-tbd-dot"></span><span class="bk-tname" style="color:#444">TBD</span>`;
       h+=`<div class="${cls}"${canClick?` onclick="toggleKOPick('${esc(currentPlayer)}','${round}',${idxArg},'${esc(t)}')" title="Click to pick / deselect"`:''}>${inner}</div>`;
       if(i===0) h+=`<div class="bk-sep"></div>`;
     });
@@ -2034,37 +2013,16 @@ function renderMobileKO(){
       const venue=KO_VENUES[round]?.[round==='final'?0:matchIdx];
       html+=`<div class="mob-ko-match">`;
       [0,1].forEach(i=>{
-        const rawT=teams[i]||'TBD';
-        const is3rdSlot=round==='r32'&&i===1&&!!R32_THIRD_GROUPS[matchIdx];
-        const grps3=is3rdSlot?R32_THIRD_GROUPS[matchIdx]:null;
-        const cands3=grps3?grps3.map(g=>actualGroups[g]?.[2]??predictions[currentPlayer]?.[g]?.[2]).filter(Boolean):null;
-        const pickIs3rd=is3rdSlot&&rawT==='TBD'&&!!pick&&pick!==teams[0];
-        const t=pickIs3rd?pick:rawT;
+        const t=teams[i]||'TBD';
         const isPick=!actual&&t!=='TBD'&&pick===t;
         const isWin=actual&&actual===t;
         const isLose=actual&&actual!==t&&t!=='TBD';
         const canClick=!locked&&t!=='TBD'&&!actual;
         const idxArg=round==='final'?0:matchIdx;
         const cls=`mob-ko-team bk-team${isPick?' bk-pick':''}${isWin?' bk-winner':''}${isLose?' bk-loser':''}`;
-        const myThirdPicks=thirdPicks[currentPlayer]||new Set();
-        let inner;
-        if(t!=='TBD'){
-          const qBadge=is3rdSlot&&myThirdPicks.has(t)?`<span style="font-size:8px;background:#0064ff33;color:#4d9fff;border-radius:2px;padding:0 3px;margin-left:3px;flex-shrink:0;line-height:1.6">Q</span>`:'';
-          inner=`${flagCircle(t,14)}<span class="bk-tname">${t}</span>${qBadge}`;
-        } else if(is3rdSlot){
-          const filtered=(cands3||[]).filter(c=>myThirdPicks.has(c));
-          const candFlags=filtered.map(c=>{
-            const canPickC=!locked&&!actual;
-            const oc=canPickC?`onclick="toggleKOPick('${esc(currentPlayer)}','r32',${matchIdx},'${esc(c)}')" title="Pick / deselect"`:'';
-            return `<span ${oc} style="display:inline-block;border-radius:50%;${canPickC?'cursor:pointer;':''}flex-shrink:0">${flagCircle(c,13)}</span>`;
-          }).join('');
-          const flagRow=filtered.length
-            ?`<span style="display:inline-flex;gap:3px;align-items:center">${candFlags}</span>`
-            :`<span class="bk-tbd-dot"></span>`;
-          inner=`${flagRow}<span class="bk-tname" style="color:#555;font-size:10px">3rd ${grps3.join('/')}</span>`;
-        } else {
-          inner=`<span class="bk-tbd-dot"></span><span class="bk-tname" style="color:#444">TBD</span>`;
-        }
+        const inner=t!=='TBD'
+          ?`${flagCircle(t,14)}<span class="bk-tname">${t}</span>`
+          :`<span class="bk-tbd-dot"></span><span class="bk-tname" style="color:#444">TBD</span>`;
         html+=`<div class="${cls}"${canClick?` onclick="toggleKOPick('${esc(currentPlayer)}','${round}',${idxArg},'${esc(t)}')" title="Pick / deselect"`:''}>${inner}</div>`;
         if(i===0) html+=`<div class="bk-sep"></div>`;
       });
@@ -2098,16 +2056,12 @@ function renderKnockout(){
     matches.forEach((m,idx)=>{
       const actual=round==='final'?actualKO.final:actualKO[round][idx];
       const labelTeams=getActualMatchTeams(round,idx);
-      const renderSide=(name,matchIdx,rnd)=>{
+      const renderSide=(name)=>{
         if(name!=='TBD') return `<span style="display:inline-flex;align-items:center;gap:3px">${flagCircle(name,14)} ${name}</span>`;
-        if(rnd!=='r32') return `<span style="color:#555;font-size:10px">TBD</span>`;
-        const grps=R32_THIRD_GROUPS[matchIdx]||[];
-        const known=grps.map(g=>actualGroups[g]?.[2]).filter(Boolean);
-        const flags=known.map(t=>flagCircle(t,13)).join('');
-        return `<span style="display:inline-flex;align-items:center;gap:3px">${flags}<span style="color:#555;font-size:10px;white-space:nowrap">3rd ${grps.join('/')}</span></span>`;
+        return `<span style="color:#555;font-size:10px">TBD</span>`;
       };
       const matchLabel=(labelTeams[0]==='TBD'&&labelTeams[1]==='TBD')?`Match ${idx+1}`
-        :`<span style="display:inline-flex;align-items:center;gap:5px;flex-wrap:wrap">${renderSide(labelTeams[0],idx,round)}<span style="color:#444">vs</span>${renderSide(labelTeams[1],idx,round)}</span>`;
+        :`<span style="display:inline-flex;align-items:center;gap:5px;flex-wrap:wrap">${renderSide(labelTeams[0])}<span style="color:#444">vs</span>${renderSide(labelTeams[1])}</span>`;
       html+=`<tr><td class="left" style="font-size:11px">${matchLabel}</td>`;
       html+=`<td class="result">${actual?`<span style="display:inline-flex;align-items:center;gap:5px">${flagCircle(actual,16)} ${actual}</span>`:'—'}</td>`;
       PLAYERS.forEach(p=>{
@@ -2283,6 +2237,7 @@ function showPage(id,btn){
   document.getElementById(id).classList.add('active');
   btn.classList.add('active');
   if(id==='knockout') setTimeout(fitBracket, 0);
+  if(id==='admin') renderAdmin();
 }
 
 function renderThirdPicks(){
@@ -2455,6 +2410,133 @@ function renderCompare(){
 }
 
 // ══════════════════════════════════════════════════════
+//  ADMIN
+// ══════════════════════════════════════════════════════
+function saveBracketOverride(idx){
+  const t1=(document.getElementById(`adm-r32-${idx}-t1`)||{}).value||'';
+  const t2=(document.getElementById(`adm-r32-${idx}-t2`)||{}).value||'';
+  if(t1||t2) bracketOverrides['r32-'+idx]=[t1||'TBD',t2||'TBD'];
+  else delete bracketOverrides['r32-'+idx];
+  localStorage.setItem('wc2026_bracket_overrides',JSON.stringify(bracketOverrides));
+  applyBracketOverrides();
+  renderAll();
+  renderAdmin();
+}
+
+function clearBracketOverride(idx){
+  delete bracketOverrides['r32-'+idx];
+  localStorage.setItem('wc2026_bracket_overrides',JSON.stringify(bracketOverrides));
+  koMatches.r32[idx].teams=['TBD','TBD'];
+  updateKOBracket();
+  applyBracketOverrides();
+  renderAll();
+  renderAdmin();
+}
+
+function setKOResultAdmin(round, idx){
+  const val=(document.getElementById(`adm-ko-${round}-${idx}`)||{}).value||'';
+  setKOResult(round, idx, val||null);
+  renderAdmin();
+}
+
+function renderAdmin(){
+  const el=document.getElementById('adminContent');
+  if(!el) return;
+  if(currentPlayer!=='Dev'){
+    el.innerHTML=`<div style="padding:3rem;text-align:center;color:var(--text-muted)">
+      <div style="font-size:14px">Access restricted.</div>
+    </div>`;
+    return;
+  }
+  const ALL_TEAMS=[...new Set(GK.flatMap(g=>GROUPS[g].teams))].sort();
+  let html=`<datalist id="adminTeamList">${ALL_TEAMS.map(t=>`<option value="${esc(t)}">`).join('')}</datalist>`;
+
+  // ── R32 Bracket overrides ──
+  html+=`<div class="ko-round-title" style="margin-bottom:.5rem">R32 Bracket Matchups</div>`;
+  html+=`<p style="font-size:11px;color:var(--text-muted);margin:0 0 .75rem">Override who plays in each R32 slot. Overrides survive page reloads and take precedence over the feed.</p>`;
+  html+=`<div class="ss-wrap"><table class="ss"><thead><tr>
+    <th style="width:40px">#</th>
+    <th class="left">Current</th>
+    <th class="left">Team 1 override</th>
+    <th class="left">Team 2 override</th>
+    <th></th>
+  </tr></thead><tbody>`;
+  for(let i=0;i<16;i++){
+    const [t1,t2]=koMatches.r32[i].teams;
+    const ov=bracketOverrides['r32-'+i];
+    const venue=KO_VENUES.r32[i]||'';
+    const ovStyle=ov?'border-color:#f0a500':'';
+    html+=`<tr>
+      <td style="font-weight:700;color:#fff;font-family:'Oswald',sans-serif">${i+1}</td>
+      <td class="left" style="font-size:11px">
+        ${dn(t1)} <span style="color:#444">vs</span> ${dn(t2)}
+        ${ov?`<span style="font-size:9px;color:#f0a500;margin-left:4px;font-family:'Oswald',sans-serif;letter-spacing:.05em">OVERRIDDEN</span>`:''}
+        <br><span style="font-size:10px;color:#404040">${venue}</span>
+      </td>
+      <td class="left">
+        <input id="adm-r32-${i}-t1" list="adminTeamList"
+          value="${esc(ov?ov[0]:(t1==='TBD'?'':t1))}"
+          placeholder="Team 1"
+          style="width:145px;background:#1a1a1a;border:1px solid #333;${ovStyle};color:#fff;padding:5px 8px;border-radius:4px;font-size:12px;font-family:'DM Sans',sans-serif;outline:none">
+      </td>
+      <td class="left">
+        <input id="adm-r32-${i}-t2" list="adminTeamList"
+          value="${esc(ov?ov[1]:(t2==='TBD'?'':t2))}"
+          placeholder="Team 2"
+          style="width:145px;background:#1a1a1a;border:1px solid #333;${ovStyle};color:#fff;padding:5px 8px;border-radius:4px;font-size:12px;font-family:'DM Sans',sans-serif;outline:none">
+      </td>
+      <td style="white-space:nowrap;padding-right:8px">
+        <button onclick="saveBracketOverride(${i})"
+          style="background:#0064ff;border:none;border-radius:4px;color:#fff;font-size:11px;font-weight:600;padding:5px 10px;cursor:pointer;margin-right:4px">Save</button>
+        ${ov?`<button onclick="clearBracketOverride(${i})"
+          style="background:transparent;border:1px solid #444;border-radius:4px;color:#888;font-size:11px;padding:5px 10px;cursor:pointer">Clear</button>`:''}
+      </td>
+    </tr>`;
+  }
+  html+=`</tbody></table></div>`;
+
+  // ── KO Results ──
+  html+=`<div class="ko-round-title" style="margin-top:2rem;margin-bottom:.5rem">KO Results</div>`;
+  html+=`<p style="font-size:11px;color:var(--text-muted);margin:0 0 .75rem">Set actual match winners manually if the feed isn't picking them up.</p>`;
+  const koRounds=[...KO_ROUNDS,'final'];
+  koRounds.forEach(round=>{
+    const label=round==='final'?'Final':KO_LABELS[round];
+    const matches=round==='final'?[koMatches.final]:koMatches[round];
+    html+=`<div style="font-family:'Oswald',sans-serif;font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#555;margin:.75rem 0 .3rem">${label} — ${KO_PTS[round]} pts</div>`;
+    html+=`<div class="ss-wrap" style="margin-bottom:.5rem"><table class="ss"><thead><tr>
+      <th style="width:40px">#</th><th class="left">Match</th><th class="left">Result</th><th class="left">Set winner</th><th></th>
+    </tr></thead><tbody>`;
+    matches.forEach((m,i)=>{
+      const actual=round==='final'?actualKO.final:(actualKO[round]?.[i]);
+      const [t1,t2]=m.teams;
+      const opts=[t1,t2].filter(t=>t&&t!=='TBD')
+        .map(t=>`<option value="${esc(t)}" ${actual===t?'selected':''}>${t}</option>`).join('');
+      html+=`<tr>
+        <td style="font-weight:700;color:#fff;font-family:'Oswald',sans-serif">${round==='final'?'F':i+1}</td>
+        <td class="left" style="font-size:11px">${dn(t1)} <span style="color:#444">vs</span> ${dn(t2)}</td>
+        <td class="left" style="font-size:11px">${actual
+          ?`<span style="color:#4dffaa;font-weight:700">${flagCircle(actual,14)} ${actual}</span>`
+          :'<span style="color:#555">—</span>'}</td>
+        <td class="left">
+          <select id="adm-ko-${round}-${i}"
+            style="background:#1a1a1a;border:1px solid #333;color:#fff;font-size:12px;padding:5px 8px;border-radius:4px;font-family:'DM Sans',sans-serif">
+            <option value="">— not played —</option>
+            ${opts}
+          </select>
+        </td>
+        <td>
+          <button onclick="setKOResultAdmin('${round}',${i})"
+            style="background:#0064ff;border:none;border-radius:4px;color:#fff;font-size:11px;font-weight:600;padding:5px 10px;cursor:pointer">Set</button>
+        </td>
+      </tr>`;
+    });
+    html+=`</tbody></table></div>`;
+  });
+
+  el.innerHTML=html;
+}
+
+// ══════════════════════════════════════════════════════
 //  INIT
 // ══════════════════════════════════════════════════════
 (async()=>{
@@ -2462,6 +2544,7 @@ function renderCompare(){
   setInterval(updateLockBanner, 3600000);
   setStatus('Loading…');
   await loadPredictions();
+  applyBracketOverrides();
   if(!currentPlayer||!PLAYERS.includes(currentPlayer)) showLogin();
   else updatePlayerDisplay();
   setMyPicksOnly(window.innerWidth<768);
