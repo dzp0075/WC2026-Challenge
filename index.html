@@ -1042,8 +1042,8 @@ const actualGroups = {};
 const thirdPlaceAdvancers = new Set();
 const actualKO = { r32:{}, r16:{}, qf:{}, sf:{}, final:null };
 
-// ── BRACKET OVERRIDES (manual admin corrections, persisted to localStorage) ──
-const bracketOverrides = JSON.parse(localStorage.getItem('wc2026_bracket_overrides')||'{}');
+// ── BRACKET OVERRIDES (manual admin corrections, synced via Supabase) ──
+const bracketOverrides = {};
 function applyBracketOverrides(){
   Object.entries(bracketOverrides).forEach(([key,teams])=>{
     const m=key.match(/^r32-(\d+)$/);
@@ -1463,6 +1463,57 @@ async function loadPredictions(){
         thirdPicks[pl]=new Set(row.third_picks);
     });
   }catch(e){ console.error('Load failed:',e); }
+}
+
+async function saveAdminState(){
+  try{
+    await sb.from('admin_state').upsert({
+      id:'singleton',
+      bracket_overrides: bracketOverrides,
+      actual_ko:{ r32:actualKO.r32, r16:actualKO.r16, qf:actualKO.qf, sf:actualKO.sf, final:actualKO.final }
+    },{onConflict:'id'});
+  }catch(e){ console.error('Admin save failed:',e); }
+}
+
+async function loadAdminState(){
+  try{
+    const {data,error}=await sb.from('admin_state').select('*').eq('id','singleton').maybeSingle();
+    if(error) throw error;
+    if(!data) return;
+    if(data.bracket_overrides) Object.assign(bracketOverrides, data.bracket_overrides);
+    if(data.actual_ko){
+      const ko=data.actual_ko;
+      if(ko.r32) Object.assign(actualKO.r32, ko.r32);
+      if(ko.r16) Object.assign(actualKO.r16, ko.r16);
+      if(ko.qf)  Object.assign(actualKO.qf,  ko.qf);
+      if(ko.sf)  Object.assign(actualKO.sf,  ko.sf);
+      if(ko.final!==undefined) actualKO.final=ko.final;
+    }
+    applyBracketOverrides();
+  }catch(e){ console.error('Admin load failed:',e); }
+}
+
+function subscribeAdminState(){
+  sb.channel('admin-state')
+    .on('postgres_changes',{event:'*',schema:'public',table:'admin_state'},async ()=>{
+      const {data,error}=await sb.from('admin_state').select('*').eq('id','singleton').maybeSingle();
+      if(error||!data) return;
+      Object.keys(bracketOverrides).forEach(k=>delete bracketOverrides[k]);
+      actualKO.r32={}; actualKO.r16={}; actualKO.qf={}; actualKO.sf={}; actualKO.final=null;
+      if(data.bracket_overrides) Object.assign(bracketOverrides, data.bracket_overrides);
+      if(data.actual_ko){
+        const ko=data.actual_ko;
+        if(ko.r32) Object.assign(actualKO.r32, ko.r32);
+        if(ko.r16) Object.assign(actualKO.r16, ko.r16);
+        if(ko.qf)  Object.assign(actualKO.qf,  ko.qf);
+        if(ko.sf)  Object.assign(actualKO.sf,  ko.sf);
+        if(ko.final!==undefined) actualKO.final=ko.final;
+      }
+      updateKOBracket();
+      applyBracketOverrides();
+      renderAll();
+    })
+    .subscribe();
 }
 
 // ══════════════════════════════════════════════════════
@@ -2132,9 +2183,10 @@ function setKOPick(player, round, idx, team){
 // ══════════════════════════════════════════════════════
 //  ADMIN: set actual KO results
 // ══════════════════════════════════════════════════════
-function setKOResult(round, idx, team){
+async function setKOResult(round, idx, team){
   if(round==='final') actualKO.final=team;
   else actualKO[round][idx]=team;
+  await saveAdminState();
   renderAll();
 }
 
@@ -2414,20 +2466,20 @@ function renderCompare(){
 // ══════════════════════════════════════════════════════
 //  ADMIN
 // ══════════════════════════════════════════════════════
-function saveBracketOverride(idx){
+async function saveBracketOverride(idx){
   const t1=(document.getElementById(`adm-r32-${idx}-t1`)||{}).value||'';
   const t2=(document.getElementById(`adm-r32-${idx}-t2`)||{}).value||'';
   if(t1||t2) bracketOverrides['r32-'+idx]=[t1||'TBD',t2||'TBD'];
   else delete bracketOverrides['r32-'+idx];
-  localStorage.setItem('wc2026_bracket_overrides',JSON.stringify(bracketOverrides));
+  await saveAdminState();
   applyBracketOverrides();
   renderAll();
   renderAdmin();
 }
 
-function clearBracketOverride(idx){
+async function clearBracketOverride(idx){
   delete bracketOverrides['r32-'+idx];
-  localStorage.setItem('wc2026_bracket_overrides',JSON.stringify(bracketOverrides));
+  await saveAdminState();
   koMatches.r32[idx].teams=['TBD','TBD'];
   updateKOBracket();
   applyBracketOverrides();
@@ -2546,7 +2598,8 @@ function renderAdmin(){
   setInterval(updateLockBanner, 3600000);
   setStatus('Loading…');
   await loadPredictions();
-  applyBracketOverrides();
+  await loadAdminState();
+  subscribeAdminState();
   if(!currentPlayer||!PLAYERS.includes(currentPlayer)) showLogin();
   else updatePlayerDisplay();
   setMyPicksOnly(window.innerWidth<768);
