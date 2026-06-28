@@ -723,7 +723,11 @@ function flagCircle(name, size=18){
 //  PREDICTION LOCK
 // ══════════════════════════════════════════════════════
 const LOCK_DATE = new Date('2026-06-12T05:00:00Z');
+<<<<<<< HEAD
 let KO_LOCK_DATE    = new Date('2026-06-29T03:59:00Z'); // 11:59 PM EDT June 28
+=======
+let KO_LOCK_DATE = new Date('2026-06-29T03:59:00Z'); // locks at 11:59pm ET (EDT) on R32 day
+>>>>>>> d0097a4ba3c52e785dcef006ae57930e031aa707
 function isLocked()  { return new Date() >= LOCK_DATE; }
 function isKOLocked(){ return new Date() >= KO_LOCK_DATE; }
 
