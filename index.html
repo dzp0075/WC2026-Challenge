@@ -723,7 +723,7 @@ function flagCircle(name, size=18){
 //  PREDICTION LOCK
 // ══════════════════════════════════════════════════════
 const LOCK_DATE = new Date('2026-06-12T05:00:00Z');
-let KO_LOCK_DATE    = new Date('2026-06-28T19:00:00Z'); // fallback; updated to first R32 kickoff once fixtures load
+let KO_LOCK_DATE    = new Date('2026-06-29T03:59:00Z'); // 11:59 PM EDT June 28
 function isLocked()  { return new Date() >= LOCK_DATE; }
 function isKOLocked(){ return new Date() >= KO_LOCK_DATE; }
 
@@ -748,7 +748,7 @@ function updateLockBanner(){
   if(isLocked()){
     const diff = KO_LOCK_DATE - new Date();
     const days = Math.ceil(diff / 864e5);
-    el.textContent = `🔒  Group picks locked  ·  ⏳  Knockout picks lock in ${days} day${days!==1?'s':''} — June 28, 2026`;
+    el.textContent = `🔒  Group picks locked  ·  ⏳  Knockout picks lock in ${days} day${days!==1?'s':''} — June 28, 2026 at 11:59 PM EDT`;
     el.className = 'lock-banner countdown';
     el.style.display = 'block';
     return;
@@ -1571,7 +1571,7 @@ async function fetchResults(){
     allFixtures=data.matches||[];
     const r32Times=allFixtures.filter(m=>m.round==='Round of 32'&&m.date&&m.time)
       .map(m=>kickoffUTC(m.date,m.time)).filter(Boolean);
-    if(r32Times.length) KO_LOCK_DATE=new Date(Math.min(...r32Times.map(d=>d.getTime())));
+    // KO_LOCK_DATE is hardcoded above; do not override from fixture times
     let matchCount=0;
     const koFixtureCount={r32:0,r16:0,qf:0,sf:0};
     (data.matches||[]).forEach(m=>{
